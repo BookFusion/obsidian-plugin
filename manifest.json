@@ -1,0 +1,10 @@
+{
+  "id": "bookfusion",
+  "name": "BookFusion",
+  "version": "1.0.0",
+  "minAppVersion": "0.15.0",
+  "description": "Import your BookFusion highlights into Obsidian.",
+  "author": "BookFusion",
+  "authorUrl": "https://www.bookfusion.com",
+  "isDesktopOnly": false
+}
