@@ -13,11 +13,10 @@ export class BookFusionSettingsTab extends PluginSettingTab {
   display (): void {
     this.containerEl.empty()
 
-    // eslint-disable-next-line @typescript-eslint/strict-boolean-expressions
-    if (this.plugin.settings.token) {
-      this.displayReadyStage()
-    } else {
+    if (this.plugin.settings.token == null) {
       this.displayStartStage()
+    } else {
+      this.displayReadyStage()
     }
   }
 
@@ -42,7 +41,7 @@ export class BookFusionSettingsTab extends PluginSettingTab {
         buttonComponent
           .setButtonText('Disconnect')
           .onClick(async () => {
-            this.plugin.settings.token = ''
+            this.plugin.settings.token = null
             await this.plugin.saveSettings()
             this.display()
           })
