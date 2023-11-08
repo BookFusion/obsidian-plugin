@@ -2,7 +2,7 @@
 import { Notice, Plugin, TFile, TFolder, addIcon, normalizePath } from 'obsidian'
 import { BookFusionPluginSettings, DEFAULT_SETTINGS } from './settings'
 import { BookFusionSettingsTab } from './settings_tab'
-import { initialSync } from './bookfusion_api'
+import { BookPage, initialSync } from './bookfusion_api'
 import logger from './logger'
 import ReportModal from './report_modal'
 import SyncReport from './sync_report'
@@ -11,6 +11,7 @@ import logoSvg from '../logo.svg'
 export class BookFusionPlugin extends Plugin {
   settings: BookFusionPluginSettings
   syncing: boolean = false
+  syncReport: SyncReport
 
   async onload (): Promise<void> {
     logger.log('Plugin is loading')
@@ -58,9 +59,9 @@ export class BookFusionPlugin extends Plugin {
     }
 
     const syncingNotice = new Notice('⏳ Sync in progress', 0)
-    const report = new SyncReport()
 
     this.syncing = true
+    this.syncReport = new SyncReport()
 
     try {
       for await (const page of initialSync(this.settings.token)) {
@@ -78,20 +79,20 @@ export class BookFusionPlugin extends Plugin {
           const file = this.app.vault.getAbstractFileByPath(filePath)
 
           if (file instanceof TFile) {
-            await this.app.vault.modify(file, page.content)
-            report.bookModified(filePath)
+            await this.modifyBookPage(page, file)
+            this.syncReport.bookModified(filePath)
           } else {
-            await this.app.vault.create(filePath, page.content)
-            report.bookCreated(filePath)
+            await this.createBookPage(page, filePath)
+            this.syncReport.bookCreated(filePath)
           }
         } catch (error) {
-          report.bookFailed(filePath, error)
+          this.syncReport.bookFailed(filePath, error)
           logger.error(error)
         }
       }
 
       new Notice('✅ Sync completed')
-      new ReportModal(this.app).display(report)
+      new ReportModal(this.app).display(this.syncReport)
     } catch (error) {
       new Notice('⛔ Sync failed due to an error')
       logger.error(error)
@@ -100,5 +101,48 @@ export class BookFusionPlugin extends Plugin {
     this.syncing = false
 
     syncingNotice.hide()
+  }
+
+  private async createBookPage (page: BookPage, filePath: string): Promise<TFile> {
+    let content = String(page.content)
+
+    if (page.frontmatter != null) {
+      content = `---\n${page.frontmatter}\n---\n${content}\n`
+    }
+
+    page.highlights.forEach((highlight) => {
+      content += `%%${highlight.id}%%\n${highlight.content}`
+    })
+
+    if (page.highlights.length > 0) {
+      this.syncReport.highlightAdded(filePath, page.highlights.length)
+    }
+
+    return await this.app.vault.create(filePath, content)
+  }
+
+  private async modifyBookPage (page: BookPage, file: TFile): Promise<TFile> {
+    const content = await this.app.vault.read(file)
+    const magicRegexp = /%%(highlight_.+)%%/g
+    const magicIds = new Set()
+    let match
+    let highlightsAdded = 0
+
+    while ((match = magicRegexp.exec(content)) != null) {
+      magicIds.add(match[1])
+    }
+
+    for await (const highlight of page.highlights) {
+      if (!magicIds.has(highlight.id)) {
+        await this.app.vault.append(file, `%%${highlight.id}%%\n${highlight.content}`)
+        highlightsAdded++
+      }
+    }
+
+    if (highlightsAdded > 0) {
+      this.syncReport.highlightAdded(file.path, highlightsAdded)
+    }
+
+    return file
   }
 }

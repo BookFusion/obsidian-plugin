@@ -15,6 +15,7 @@ export default class SyncReport {
   booksCreated: BookCreatedEvent[] = []
   booksModified: BookModifiedEvent[] = []
   booksFailed: BookFailedEvent[] = []
+  highlightsAdded: Map<string, number> = new Map()
 
   bookCreated (path: string): void {
     this.booksCreated.push({ path })
@@ -26,5 +27,10 @@ export default class SyncReport {
 
   bookFailed (path: string | null, error: Error): void {
     this.booksFailed.push({ path, error })
+  }
+
+  highlightAdded (path: string, offset: number = 1): void {
+    const value = this.highlightsAdded.get(path) ?? 0
+    this.highlightsAdded.set(path, value + offset)
   }
 }

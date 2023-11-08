@@ -42,5 +42,20 @@ export default class ReportModal extends Modal {
         }
       })
     }
+
+    if (report.highlightsAdded.size > 0) {
+      const list = this.contentEl.ownerDocument.createElement('ul')
+      let total = 0
+
+      for (const entry of report.highlightsAdded) {
+        const [path, value] = entry
+        list.createEl('li').appendText(`${value} — ${path}`)
+        total += value
+      }
+
+      const details = this.contentEl.createEl('details')
+      details.createEl('summary', { text: `${total} highlight(s) added` })
+      details.appendChild(list)
+    }
   }
 }

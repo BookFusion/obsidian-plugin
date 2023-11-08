@@ -1,18 +1,26 @@
 /* eslint-disable-next-line @typescript-eslint/strict-boolean-expressions, @typescript-eslint/prefer-nullish-coalescing */
 export const BASE_URL = process.env.BOOKFUSION_URL || 'https://www.bookfusion.com'
 
-export interface Page {
-  content: string
+export interface BookPage {
+  id: string
+  frontmatter: string | null
+  content: string | null
   directory: string
   filename: string
+  highlights: HighlightBlock[]
+}
+
+export interface HighlightBlock {
+  id: string
+  content: string
 }
 
 interface SyncResponse {
-  pages: Page[]
+  pages: BookPage[]
   cursor: string | null
 }
 
-export async function * initialSync (token: string): AsyncGenerator<Page> {
+export async function * initialSync (token: string): AsyncGenerator<BookPage> {
   const url = new URL('/obsidian-api/sync', BASE_URL)
   let cursor
 
