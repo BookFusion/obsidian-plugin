@@ -69,7 +69,7 @@ export class BookFusionPlugin extends Plugin {
 
         try {
           const dirPath = normalizePath(page.directory)
-          filePath = normalizePath(`${dirPath}/${page.filename}.md`)
+          filePath = normalizePath(`${dirPath}/${page.filename}`)
           const directory = this.app.vault.getAbstractFileByPath(dirPath)
 
           if (!(directory instanceof TFolder)) {
