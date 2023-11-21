@@ -80,10 +80,8 @@ export class BookFusionPlugin extends Plugin {
 
           if (file instanceof TFile) {
             await this.modifyBookPage(page, file)
-            this.syncReport.bookModified(filePath)
           } else {
             await this.createBookPage(page, filePath)
-            this.syncReport.bookCreated(filePath)
           }
         } catch (error) {
           this.syncReport.bookFailed(filePath, error)
@@ -118,7 +116,10 @@ export class BookFusionPlugin extends Plugin {
       this.syncReport.highlightAdded(filePath, page.highlights.length)
     }
 
-    return await this.app.vault.create(filePath, content)
+    const file = await this.app.vault.create(filePath, content)
+    this.syncReport.bookCreated(filePath)
+
+    return file
   }
 
   private async modifyBookPage (page: BookPage, file: TFile): Promise<TFile> {
