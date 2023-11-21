@@ -3,6 +3,8 @@ import SyncReport from './sync_report'
 
 export default class ReportModal extends Modal {
   display (report: SyncReport): void {
+    if (report.isEmpty()) return
+
     this.open()
 
     if (report.booksCreated.length > 0) {

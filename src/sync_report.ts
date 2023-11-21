@@ -17,6 +17,13 @@ export default class SyncReport {
   booksFailed: BookFailedEvent[] = []
   highlightsAdded: Map<string, number> = new Map()
 
+  isEmpty (): boolean {
+    return this.booksCreated.length === 0 &&
+      this.booksModified.length === 0 &&
+      this.booksFailed.length === 0 &&
+      this.highlightsAdded.size === 0
+  }
+
   bookCreated (path: string): void {
     this.booksCreated.push({ path })
   }
