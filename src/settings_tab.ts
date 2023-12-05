@@ -29,7 +29,7 @@ export class BookFusionSettingsTab extends PluginSettingTab {
           .setButtonText('Connect')
           .setCta()
           .onClick(async () => {
-            window.open(new URL('/obsidian', BASE_URL))
+            window.open(new URL('/obsidian-api/connect', BASE_URL))
           })
       })
   }
