@@ -13,6 +13,7 @@ export interface BookPage {
 export interface HighlightBlock {
   id: string
   content: string
+  chapter_heading: string
 }
 
 interface SyncResponse {

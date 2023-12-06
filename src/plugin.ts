@@ -108,11 +108,14 @@ export class BookFusionPlugin extends Plugin {
       content = `---\n${page.frontmatter}\n---\n${content}\n`
     }
 
-    page.highlights.forEach((highlight) => {
-      content += `%%${highlight.id}%%\n${highlight.content}`
-    })
-
     if (page.highlights.length > 0) {
+      page.highlights.forEach((highlight) => {
+        if (highlight.chapter_heading != null) {
+          content += `${highlight.chapter_heading}\n`
+        }
+        content += `%%${highlight.id}%%\n${highlight.content}`
+      })
+
       this.syncReport.highlightAdded(filePath, page.highlights.length)
     }
 
