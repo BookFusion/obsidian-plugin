@@ -59,6 +59,7 @@ export class BookFusionPlugin extends Plugin {
     }
 
     const syncingNotice = new Notice('⏳ Sync in progress', 0)
+    logger.log('Sync in progress')
 
     this.syncing = true
     this.syncReport = new SyncReport()
@@ -91,6 +92,7 @@ export class BookFusionPlugin extends Plugin {
 
       new Notice('✅ Sync completed')
       new ReportModal(this.app).display(this.syncReport)
+      logger.log('Sync completed')
     } catch (error) {
       new Notice('⛔ Sync failed due to an error')
       logger.error(error)
