@@ -13,7 +13,12 @@ export interface BookPage {
 export interface HighlightBlock {
   id: string
   content: string
-  chapter_heading: string
+  chapter_heading: string | null
+}
+
+interface SyncOptions {
+  token: string
+  signal?: AbortSignal
 }
 
 interface SyncResponse {
@@ -21,7 +26,7 @@ interface SyncResponse {
   cursor: string | null
 }
 
-export async function * initialSync (token: string): AsyncGenerator<BookPage> {
+export async function * initialSync (options: SyncOptions): AsyncGenerator<BookPage> {
   const url = new URL('/obsidian-api/sync', BASE_URL)
   let cursor
 
@@ -30,10 +35,11 @@ export async function * initialSync (token: string): AsyncGenerator<BookPage> {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-Token': token,
+        'X-Token': options.token,
         'API-Version': '1'
       },
-      body: JSON.stringify({ cursor })
+      body: JSON.stringify({ cursor }),
+      signal: options.signal
     })
     const body = await response.json() as SyncResponse
 

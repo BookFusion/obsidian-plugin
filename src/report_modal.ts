@@ -7,6 +7,8 @@ export default class ReportModal extends Modal {
 
     this.open()
 
+    this.titleEl.setText('Sync Report')
+
     if (report.booksCreated.length > 0) {
       const details = this.contentEl.createEl('details')
       details.createEl('summary', { text: `${report.booksCreated.length} books added` })

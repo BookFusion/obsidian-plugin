@@ -7,20 +7,22 @@ import logger from './logger'
 import ReportModal from './report_modal'
 import SyncReport from './sync_report'
 import logoSvg from '../logo.svg'
+import ConfirmationModal from './confirmation_modal'
 
 const SYNC_NOTICE_TEXT = '⏳ Sync in progress'
 
 export class BookFusionPlugin extends Plugin {
   settings: BookFusionPluginSettings
   syncing: boolean = false
+  syncAbortController: AbortController
   syncReport: SyncReport
 
   async onload (): Promise<void> {
     logger.log('Plugin is loading')
 
     addIcon('bookfusion-logo', logoSvg)
-    this.addRibbonIcon('bookfusion-logo', 'BookFusion', async () => await this.syncCommand())
-    this.addCommand({ id: 'sync', name: 'Sync', callback: async () => await this.syncCommand() })
+    this.addRibbonIcon('bookfusion-logo', 'BookFusion', async () => await this.requestSync())
+    this.addCommand({ id: 'sync', name: 'Sync', callback: async () => await this.requestSync() })
 
     await this.loadSettings()
 
@@ -38,6 +40,7 @@ export class BookFusionPlugin extends Plugin {
   }
 
   async onunload (): Promise<void> {
+    this.syncAbortController?.abort()
     logger.log('Plugin is unloaded')
   }
 
@@ -47,6 +50,25 @@ export class BookFusionPlugin extends Plugin {
 
   async saveSettings (): Promise<void> {
     await this.saveData(this.settings)
+  }
+
+  private async requestSync (): Promise<void> {
+    if (this.syncing) {
+      return await new Promise((resolve, _reject) => {
+        const confirm =
+          new ConfirmationModal(this.app, 'The sync process is currently in progress. Do you want to stop it?')
+        confirm.onPositive = () => {
+          this.syncAbortController.abort()
+          resolve()
+        }
+        confirm.onNegative = () => {
+          resolve()
+        }
+        confirm.open()
+      })
+    } else {
+      return await this.syncCommand()
+    }
   }
 
   private async syncCommand (): Promise<void> {
@@ -64,12 +86,13 @@ export class BookFusionPlugin extends Plugin {
     logger.log('Sync in progress')
 
     this.syncing = true
+    this.syncAbortController = new AbortController()
     this.syncReport = new SyncReport()
 
     let booksProcessed = 0
 
     try {
-      for await (const page of initialSync(this.settings.token)) {
+      for await (const page of initialSync({ token: this.settings.token, signal: this.syncAbortController.signal })) {
         let filePath = null
 
         try {
@@ -100,8 +123,13 @@ export class BookFusionPlugin extends Plugin {
       new ReportModal(this.app).display(this.syncReport)
       logger.log('Sync completed')
     } catch (error) {
-      new Notice('⛔ Sync failed due to an error')
-      logger.error(error)
+      if (this.syncAbortController.signal.aborted) {
+        new Notice('🛑 Sync stopped by user')
+        logger.log('Sync stopped by user')
+      } else {
+        new Notice('💥 Sync failed due to an error')
+        logger.error(error)
+      }
     }
 
     this.syncing = false
