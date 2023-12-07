@@ -8,6 +8,8 @@ import ReportModal from './report_modal'
 import SyncReport from './sync_report'
 import logoSvg from '../logo.svg'
 
+const SYNC_NOTICE_TEXT = '⏳ Sync in progress'
+
 export class BookFusionPlugin extends Plugin {
   settings: BookFusionPluginSettings
   syncing: boolean = false
@@ -58,11 +60,13 @@ export class BookFusionPlugin extends Plugin {
       return
     }
 
-    const syncingNotice = new Notice('⏳ Sync in progress', 0)
+    const syncingNotice = new Notice(SYNC_NOTICE_TEXT, 0)
     logger.log('Sync in progress')
 
     this.syncing = true
     this.syncReport = new SyncReport()
+
+    let booksProcessed = 0
 
     try {
       for await (const page of initialSync(this.settings.token)) {
@@ -84,6 +88,8 @@ export class BookFusionPlugin extends Plugin {
           } else {
             await this.createBookPage(page, filePath)
           }
+
+          syncingNotice.setMessage(`${SYNC_NOTICE_TEXT}. ${++booksProcessed} book(s) processed`)
         } catch (error) {
           this.syncReport.bookFailed(filePath, error)
           logger.error(error)
