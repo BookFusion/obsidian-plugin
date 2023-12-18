@@ -39,6 +39,16 @@ export class BookFusionSettingsTab extends PluginSettingTab {
       .setName('Obsidian is connected to BookFusion')
       .addButton((buttonComponent) => {
         buttonComponent
+          .setCta()
+          .setIcon('settings')
+          .onClick(async () => {
+            const url = new URL('/obsidian-api/connect', BASE_URL)
+            url.searchParams.set('token', String(this.plugin.settings.token))
+            window.open(url)
+          })
+      })
+      .addButton((buttonComponent) => {
+        buttonComponent
           .setButtonText('Disconnect')
           .onClick(async () => {
             this.plugin.settings.token = null
