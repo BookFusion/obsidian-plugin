@@ -2,7 +2,7 @@
 import { Notice, Plugin, TFile, TFolder, addIcon, normalizePath } from 'obsidian'
 import { BookFusionPluginSettings, DEFAULT_SETTINGS } from './settings'
 import { BookFusionSettingsTab } from './settings_tab'
-import { BookPage, initialSync } from './bookfusion_api'
+import { Page, BookPage, initialSync } from './bookfusion_api'
 import logger from './logger'
 import ReportModal from './report_modal'
 import SyncReport from './sync_report'
@@ -106,15 +106,26 @@ export class BookFusionPlugin extends Plugin {
 
           const file = this.app.vault.getAbstractFileByPath(filePath)
 
-          if (file instanceof TFile) {
-            await this.modifyBookPage(page, file)
-          } else {
-            await this.createBookPage(page, filePath)
+          switch (page.type) {
+            case 'index':
+              if (file instanceof TFile) {
+                await this.modifyIndexPage(page, file)
+              } else {
+                await this.createIndexPage(page, filePath)
+              }
+              syncingNotice.setMessage(`${SYNC_NOTICE_TEXT}. Updating index pages.`)
+              break
+            case 'book':
+            default:
+              if (file instanceof TFile) {
+                await this.modifyBookPage(page as BookPage, file)
+              } else {
+                await this.createBookPage(page as BookPage, filePath)
+              }
+              syncingNotice.setMessage(`${SYNC_NOTICE_TEXT}. ${++booksProcessed} book(s) processed`)
           }
-
-          syncingNotice.setMessage(`${SYNC_NOTICE_TEXT}. ${++booksProcessed} book(s) processed`)
         } catch (error) {
-          this.syncReport.bookFailed(filePath, error)
+          this.syncReport.indexFailed(filePath, error)
           logger.error(error)
         }
       }
@@ -135,6 +146,22 @@ export class BookFusionPlugin extends Plugin {
     this.syncing = false
 
     syncingNotice.hide()
+  }
+
+  private async createIndexPage (page: Page, filePath: string): Promise<TFile> {
+    const content = String(page.content)
+
+    const file = await this.app.vault.create(filePath, content)
+
+    return file
+  }
+
+  private async modifyIndexPage (page: Page, file: TFile): Promise<TFile> {
+    const content = String(page.content)
+
+    await this.app.vault.modify(file, content)
+
+    return file
   }
 
   private async createBookPage (page: BookPage, filePath: string): Promise<TFile> {

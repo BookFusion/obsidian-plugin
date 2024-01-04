@@ -1,12 +1,16 @@
 /* eslint-disable-next-line @typescript-eslint/strict-boolean-expressions, @typescript-eslint/prefer-nullish-coalescing */
 export const BASE_URL = process.env.BOOKFUSION_URL || 'https://www.bookfusion.com'
 
-export interface BookPage {
-  id: string
-  frontmatter: string | null
+export interface Page {
+  type: string
   content: string | null
   directory: string
   filename: string
+}
+
+export interface BookPage extends Page {
+  id: string
+  frontmatter: string | null
   highlights: HighlightBlock[]
 }
 
@@ -26,8 +30,9 @@ interface SyncResponse {
   cursor: string | null
 }
 
-export async function * initialSync (options: SyncOptions): AsyncGenerator<BookPage> {
+export async function * initialSync (options: SyncOptions): AsyncGenerator<Page> {
   const url = new URL('/obsidian-api/sync', BASE_URL)
+  const cursors = new Set()
   let cursor
 
   do {
@@ -51,7 +56,11 @@ export async function * initialSync (options: SyncOptions): AsyncGenerator<BookP
     if (body.cursor === cursor) {
       throw new Error('Next pagination cursor is the same as current. Stopping sync.')
     }
+    if (cursors.has(body.cursor)) {
+      throw new Error('Pagination is looped! Abort sync.')
+    }
 
     cursor = body.cursor
+    cursors.add(cursor)
   } while (cursor != null)
 }

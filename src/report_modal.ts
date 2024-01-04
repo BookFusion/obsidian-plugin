@@ -47,6 +47,22 @@ export default class ReportModal extends Modal {
       })
     }
 
+    if (report.indicesFailed.length > 0) {
+      const details = this.contentEl.createEl('details')
+      details.createEl('summary', { text: `${report.indicesFailed.length} index processing errors. See logs in console` })
+
+      const list = details.createEl('ul')
+
+      report.indicesFailed.forEach(({ path, error }) => {
+        if (path != null) {
+          const item = list.createEl('li')
+          item.appendText(path)
+          item.createEl('br')
+          item.appendText(`${error.name}: ${error.message}`)
+        }
+      })
+    }
+
     if (report.highlightsAdded.size > 0) {
       const list = this.contentEl.ownerDocument.createElement('ul')
       let total = 0
