@@ -101,7 +101,11 @@ export class BookFusionPlugin extends Plugin {
           const directory = this.app.vault.getAbstractFileByPath(dirPath)
 
           if (!(directory instanceof TFolder)) {
-            await this.app.vault.createFolder(dirPath)
+            try {
+              await this.app.vault.createFolder(dirPath)
+            } catch {
+              logger.log(`Folder \`${dirPath}\` already exists.`)
+            }
           }
 
           const file = this.app.vault.getAbstractFileByPath(filePath)
