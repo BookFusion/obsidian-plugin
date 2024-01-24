@@ -97,15 +97,11 @@ export class BookFusionPlugin extends Plugin {
 
         try {
           const dirPath = normalizePath(page.directory)
-          filePath = normalizePath(`${dirPath}/${page.filename}`)
           const directory = this.app.vault.getAbstractFileByPath(dirPath)
+          filePath = normalizePath(`${dirPath}/${page.filename}`)
 
           if (!(directory instanceof TFolder)) {
-            try {
-              await this.app.vault.createFolder(dirPath)
-            } catch {
-              logger.log(`Folder \`${dirPath}\` already exists.`)
-            }
+            await this.tryCreateFolder(dirPath)
           }
 
           const file = this.app.vault.getAbstractFileByPath(filePath)
@@ -176,12 +172,25 @@ export class BookFusionPlugin extends Plugin {
     }
 
     if (page.highlights.length > 0) {
-      page.highlights.forEach((highlight) => {
-        if (highlight.chapter_heading != null) {
-          content += `${highlight.chapter_heading}\n`
+      for (const highlight of page.highlights) {
+        if (highlight.directory != null && highlight.filename != null) {
+          // Atomic highlight strategy
+          const dirPath = normalizePath(highlight.directory)
+          const directory = this.app.vault.getAbstractFileByPath(dirPath)
+
+          if (!(directory instanceof TFolder)) {
+            await this.tryCreateFolder(dirPath)
+          }
+
+          await this.app.vault.create(normalizePath(`${dirPath}/${highlight.filename}`), highlight.content)
+        } else {
+          // Inline highlight strategy
+          if (highlight.chapter_heading != null) {
+            content += `${highlight.chapter_heading}\n`
+          }
+          content += `%%${highlight.id}%%\n${highlight.content}`
         }
-        content += `%%${highlight.id}%%\n${highlight.content}`
-      })
+      }
 
       this.syncReport.highlightAdded(filePath, page.highlights.length)
     }
@@ -193,20 +202,43 @@ export class BookFusionPlugin extends Plugin {
   }
 
   private async modifyBookPage (page: BookPage, file: TFile): Promise<TFile> {
-    const content = await this.app.vault.read(file)
-    const magicRegexp = /%%(highlight_.+)%%/g
-    const magicIds = new Set()
-    let match
-    let highlightsAdded = 0
-
-    while ((match = magicRegexp.exec(content)) != null) {
-      magicIds.add(match[1])
+    if (page.highlights.length <= 0) {
+      return file
     }
 
-    for await (const highlight of page.highlights) {
-      if (!magicIds.has(highlight.id)) {
-        await this.app.vault.append(file, `%%${highlight.id}%%\n${highlight.content}`)
-        highlightsAdded++
+    let highlightsAdded = 0
+
+    if (page.highlights[0].directory != null && page.highlights[0].filename != null) {
+      // Atomic highlight strategy
+      for (const highlight of page.highlights) {
+        const dirPath = normalizePath(String(highlight.directory))
+        const filePath = normalizePath(dirPath + '/' + String(highlight.filename))
+
+        if (this.app.vault.getAbstractFileByPath(dirPath) == null) {
+          await this.tryCreateFolder(dirPath)
+        }
+
+        if (this.app.vault.getAbstractFileByPath(filePath) == null) {
+          await this.app.vault.create(filePath, highlight.content)
+          highlightsAdded++
+        }
+      }
+    } else {
+      // Inline highlight strategy
+      const content = await this.app.vault.read(file)
+      const magicRegexp = /%%(highlight_.+)%%/g
+      const magicIds = new Set()
+      let match
+
+      while ((match = magicRegexp.exec(content)) != null) {
+        magicIds.add(match[1])
+      }
+
+      for (const highlight of page.highlights) {
+        if (!magicIds.has(highlight.id)) {
+          await this.app.vault.append(file, `%%${highlight.id}%%\n${highlight.content}`)
+          highlightsAdded++
+        }
       }
     }
 
@@ -215,5 +247,13 @@ export class BookFusionPlugin extends Plugin {
     }
 
     return file
+  }
+
+  private async tryCreateFolder (dirPath: string): Promise<TFolder | undefined> {
+    try {
+      return await this.app.vault.createFolder(dirPath)
+    } catch {
+      logger.log(`Folder \`${dirPath}\` already exists.`)
+    }
   }
 }

@@ -18,6 +18,8 @@ export interface HighlightBlock {
   id: string
   content: string
   chapter_heading: string | null
+  directory: string | null
+  filename: string | null
 }
 
 interface SyncOptions {
