@@ -28,9 +28,7 @@ export class BookFusionSettingsTab extends PluginSettingTab {
         buttonComponent
           .setButtonText('Connect')
           .setCta()
-          .onClick(async () => {
-            window.open(new URL('/obsidian-api/connect', BASE_URL))
-          })
+          .onClick(this.connect.bind(this))
       })
   }
 
@@ -41,20 +39,50 @@ export class BookFusionSettingsTab extends PluginSettingTab {
         buttonComponent
           .setCta()
           .setIcon('settings')
-          .onClick(async () => {
-            const url = new URL('/obsidian-api/connect', BASE_URL)
-            url.searchParams.set('token', String(this.plugin.settings.token))
-            window.open(url)
-          })
+          .onClick(this.openSettingsPage.bind(this))
       })
       .addButton((buttonComponent) => {
         buttonComponent
           .setButtonText('Disconnect')
-          .onClick(async () => {
-            this.plugin.settings.token = null
-            await this.plugin.saveSettings()
-            this.display()
-          })
+          .onClick(this.disconnect.bind(this))
       })
+
+    new Setting(this.containerEl)
+      .setName('Clear synchronization state')
+      .addButton((buttonComponent) => {
+        buttonComponent.setIcon('trash')
+
+        if (this.plugin.settings.cursor == null) {
+          buttonComponent
+            .setDisabled(true)
+            .setClass('mod-muted')
+        } else {
+          buttonComponent
+            .setWarning()
+            .onClick(this.clearSyncState.bind(this))
+        }
+      })
+  }
+
+  private connect (): void {
+    window.open(new URL('/obsidian-api/connect', BASE_URL))
+  }
+
+  private async openSettingsPage (): Promise<undefined> {
+    const url = new URL('/obsidian-api/connect', BASE_URL)
+    url.searchParams.set('token', String(this.plugin.settings.token))
+    window.open(url)
+  }
+
+  private async disconnect (): Promise<undefined> {
+    this.plugin.settings.token = null
+    await this.plugin.saveSettings()
+    this.display()
+  }
+
+  private async clearSyncState (): Promise<void> {
+    this.plugin.settings.cursor = null
+    await this.plugin.saveSettings()
+    this.display()
   }
 }

@@ -2,7 +2,7 @@
 import { Notice, Plugin, TFile, TFolder, addIcon, normalizePath } from 'obsidian'
 import { BookFusionPluginSettings, DEFAULT_SETTINGS } from './settings'
 import { BookFusionSettingsTab } from './settings_tab'
-import { Page, BookPage, initialSync } from './bookfusion_api'
+import { BookPage, IndexPage, SyncTask } from './bookfusion_api'
 import logger from './logger'
 import ReportModal from './report_modal'
 import SyncReport from './sync_report'
@@ -13,8 +13,7 @@ const SYNC_NOTICE_TEXT = '⏳ Sync in progress'
 
 export class BookFusionPlugin extends Plugin {
   settings: BookFusionPluginSettings
-  syncing: boolean = false
-  syncAbortController: AbortController
+  syncTask: SyncTask
   syncReport: SyncReport
 
   async onload (): Promise<void> {
@@ -40,7 +39,7 @@ export class BookFusionPlugin extends Plugin {
   }
 
   async onunload (): Promise<void> {
-    this.syncAbortController?.abort()
+    this.syncTask?.abort()
     logger.log('Plugin is unloaded')
   }
 
@@ -53,12 +52,12 @@ export class BookFusionPlugin extends Plugin {
   }
 
   private async requestSync (): Promise<void> {
-    if (this.syncing) {
+    if (this.syncTask?.isRunning) {
       return await new Promise((resolve, _reject) => {
         const confirm =
           new ConfirmationModal(this.app, 'The sync process is currently in progress. Do you want to stop it?')
         confirm.onPositive = () => {
-          this.syncAbortController.abort()
+          this.syncTask.abort()
           resolve()
         }
         confirm.onNegative = () => {
@@ -72,7 +71,7 @@ export class BookFusionPlugin extends Plugin {
   }
 
   private async syncCommand (): Promise<void> {
-    if (this.syncing) {
+    if (this.syncTask?.isRunning) {
       new Notice('⏳ Already syncing')
       return
     }
@@ -85,81 +84,64 @@ export class BookFusionPlugin extends Plugin {
     const syncingNotice = new Notice(SYNC_NOTICE_TEXT, 0)
     logger.log('Sync in progress')
 
-    this.syncing = true
-    this.syncAbortController = new AbortController()
+    this.syncTask = new SyncTask({ token: this.settings.token })
     this.syncReport = new SyncReport()
 
+    let pagesProcessed = 0
     let booksProcessed = 0
 
     try {
-      for await (const page of initialSync({ token: this.settings.token, signal: this.syncAbortController.signal })) {
-        let filePath = null
+      for await (const page of this.syncTask.run(this.settings.cursor)) {
+        const dirPath = normalizePath(page.directory)
+        const directory = this.app.vault.getAbstractFileByPath(dirPath)
+        const filePath = normalizePath(`${dirPath}/${page.filename}`)
 
-        try {
-          const dirPath = normalizePath(page.directory)
-          const directory = this.app.vault.getAbstractFileByPath(dirPath)
-          filePath = normalizePath(`${dirPath}/${page.filename}`)
-
-          if (!(directory instanceof TFolder)) {
-            await this.tryCreateFolder(dirPath)
-          }
-
-          const file = this.app.vault.getAbstractFileByPath(filePath)
-
-          switch (page.type) {
-            case 'index':
-              if (file instanceof TFile) {
-                await this.modifyIndexPage(page, file)
-              } else {
-                await this.createIndexPage(page, filePath)
-              }
-              syncingNotice.setMessage(`${SYNC_NOTICE_TEXT}. Updating index pages.`)
-              break
-            case 'book':
-            default:
-              if (file instanceof TFile) {
-                await this.modifyBookPage(page as BookPage, file)
-              } else {
-                await this.createBookPage(page as BookPage, filePath)
-              }
-              syncingNotice.setMessage(`${SYNC_NOTICE_TEXT}. ${++booksProcessed} book(s) processed`)
-          }
-        } catch (error) {
-          this.syncReport.indexFailed(filePath, error)
-          logger.error(error)
+        if (!(directory instanceof TFolder)) {
+          await this.tryCreateFolder(dirPath)
         }
+
+        if (page.type === 'index') {
+          await this.createOrUpdateIndexPage(page as IndexPage, filePath)
+          syncingNotice.setMessage(`${SYNC_NOTICE_TEXT}. Updating index pages.`)
+        } else {
+          await this.createOrUpdateBookPage(page as BookPage, filePath)
+          syncingNotice.setMessage(`${SYNC_NOTICE_TEXT}. ${++booksProcessed} book(s) processed`)
+        }
+
+        pagesProcessed++
       }
 
-      new Notice('✅ Sync completed')
+      {
+        let message = '✅ Sync completed'
+        if (pagesProcessed === 0) message += '. No updates'
+        new Notice(message)
+      }
+
       new ReportModal(this.app).display(this.syncReport)
       logger.log('Sync completed')
+
+      this.settings.cursor = this.syncTask.lastResponse.next_sync_cursor
+      await this.saveSettings()
     } catch (error) {
-      if (this.syncAbortController.signal.aborted) {
+      if (this.syncTask.isAborted) {
         new Notice('🛑 Sync stopped by user')
         logger.log('Sync stopped by user')
       } else {
         new Notice('💥 Sync failed due to an error')
         logger.error(error)
+        logger.log(this.syncTask.lastResponse)
       }
     }
-
-    this.syncing = false
 
     syncingNotice.hide()
   }
 
-  private async createIndexPage (page: Page, filePath: string): Promise<TFile> {
-    const content = String(page.content)
-
-    const file = await this.app.vault.create(filePath, content)
-
-    return file
+  private async createIndexPage (page: IndexPage, filePath: string): Promise<TFile> {
+    return await this.app.vault.create(filePath, String(page.content))
   }
 
-  private async modifyIndexPage (page: Page, file: TFile): Promise<TFile> {
-    const content = String(page.content)
-
-    await this.app.vault.modify(file, content)
+  private async modifyIndexPage (page: IndexPage, file: TFile): Promise<TFile> {
+    await this.app.vault.modify(file, String(page.content))
 
     return file
   }
@@ -254,6 +236,38 @@ export class BookFusionPlugin extends Plugin {
       return await this.app.vault.createFolder(dirPath)
     } catch {
       logger.log(`Folder \`${dirPath}\` already exists.`)
+    }
+  }
+
+  private async createOrUpdateBookPage (page: BookPage, filePath: string): Promise<TFile | undefined> {
+    const file = this.app.vault.getAbstractFileByPath(filePath)
+
+    try {
+      if (file instanceof TFile) {
+        return await this.modifyBookPage(page, file)
+      } else {
+        return await this.createBookPage(page, filePath)
+      }
+    } catch (error) {
+      this.syncReport.bookFailed(filePath, error)
+      logger.error(error)
+      logger.log(this.syncTask.lastResponse)
+    }
+  }
+
+  private async createOrUpdateIndexPage (page: IndexPage, filePath: string): Promise<TFile | undefined> {
+    const file = this.app.vault.getAbstractFileByPath(filePath)
+
+    try {
+      if (file instanceof TFile) {
+        return await this.modifyIndexPage(page, file)
+      } else {
+        return await this.createIndexPage(page, filePath)
+      }
+    } catch (error) {
+      this.syncReport.indexFailed(filePath, error)
+      logger.error(error)
+      logger.log(this.syncTask.lastResponse)
     }
   }
 }
