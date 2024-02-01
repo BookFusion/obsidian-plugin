@@ -13,6 +13,7 @@ const SYNC_NOTICE_TEXT = '⏳ Sync in progress'
 
 export class BookFusionPlugin extends Plugin {
   settings: BookFusionPluginSettings
+  syncTimer: number | null
   syncTask: SyncTask
   syncReport: SyncReport
 
@@ -35,11 +36,14 @@ export class BookFusionPlugin extends Plugin {
       settingsTab.display()
     })
 
+    this.scheduleSync()
+
     logger.log('Plugin is loaded')
   }
 
   async onunload (): Promise<void> {
     this.syncTask?.abort()
+    this.unscheduleSync()
     logger.log('Plugin is unloaded')
   }
 
@@ -71,11 +75,6 @@ export class BookFusionPlugin extends Plugin {
   }
 
   private async syncCommand (): Promise<void> {
-    if (this.syncTask?.isRunning) {
-      new Notice('⏳ Already syncing')
-      return
-    }
-
     if (this.settings.token == null) {
       new Notice('🛑 First you need to configure the plugin')
       return
@@ -269,5 +268,32 @@ export class BookFusionPlugin extends Plugin {
       logger.error(error)
       logger.log(this.syncTask.lastResponse)
     }
+  }
+
+  scheduleSync (): void {
+    if (this.settings.nextSyncAt == null) return
+
+    const timeout = this.settings.nextSyncAt - Date.now()
+
+    this.syncTimer = window.setTimeout(async () => {
+      if (this.syncTask?.isRunning) return
+      await this.syncCommand()
+      this.rescheduleSync()
+    }, timeout)
+  }
+
+  async rescheduleSync (): Promise<void> {
+    if (this.settings.syncInterval == null) return
+
+    this.settings.nextSyncAt = Date.now() + this.settings.syncInterval
+    await this.saveSettings()
+    this.scheduleSync()
+  }
+
+  unscheduleSync (): void {
+    if (this.syncTimer == null) return
+
+    clearTimeout(this.syncTimer)
+    this.syncTimer = null
   }
 }
