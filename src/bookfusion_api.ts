@@ -1,3 +1,5 @@
+import { UpdateStrategyId } from './update_strategy/update_strategy'
+
 /* eslint-disable-next-line @typescript-eslint/strict-boolean-expressions, @typescript-eslint/prefer-nullish-coalescing */
 export const BASE_URL = process.env.BOOKFUSION_URL || 'https://www.bookfusion.com'
 const SYNC_URL = new URL('/obsidian-api/sync', BASE_URL)
@@ -7,6 +9,7 @@ export interface Page {
   content: string | null
   directory: string
   filename: string
+  update_strategy: UpdateStrategyId
 }
 
 export interface BookPage extends Page {

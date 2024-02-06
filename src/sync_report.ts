@@ -18,14 +18,14 @@ export default class SyncReport {
   booksCreated: BookCreatedEvent[] = []
   booksModified: BookModifiedEvent[] = []
   booksFailed: BookFailedEvent[] = []
-  highlightsAdded: Map<string, number> = new Map()
+  highlightsModified: Map<string, number> = new Map()
 
   isEmpty (): boolean {
     return this.indicesFailed.length === 0 &&
       this.booksCreated.length === 0 &&
       this.booksModified.length === 0 &&
       this.booksFailed.length === 0 &&
-      this.highlightsAdded.size === 0
+      this.highlightsModified.size === 0
   }
 
   indexFailed (path: string | null, error: Error): void {
@@ -44,8 +44,8 @@ export default class SyncReport {
     this.booksFailed.push({ path, error })
   }
 
-  highlightAdded (path: string, offset: number = 1): void {
-    const value = this.highlightsAdded.get(path) ?? 0
-    this.highlightsAdded.set(path, value + offset)
+  highlightModified (path: string, offset: number = 1): void {
+    const value = this.highlightsModified.get(path) ?? 0
+    this.highlightsModified.set(path, value + offset)
   }
 }

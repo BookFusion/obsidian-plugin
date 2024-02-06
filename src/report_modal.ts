@@ -63,13 +63,13 @@ export default class ReportModal extends Modal {
       })
     }
 
-    if (report.highlightsAdded.size > 0) {
+    if (report.highlightsModified.size > 0) {
       const list = this.contentEl.ownerDocument.createElement('ul')
       let total = 0
 
-      for (const entry of report.highlightsAdded) {
+      for (const entry of report.highlightsModified) {
         const [path, value] = entry
-        list.createEl('li').appendText(`${value} — ${path}`)
+        list.createEl('li').appendText(value == null ? path : `${value} — ${path}`)
         total += value
       }
 

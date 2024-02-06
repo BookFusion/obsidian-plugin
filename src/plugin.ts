@@ -1,13 +1,15 @@
 /* eslint-disable no-new */
-import { Notice, Plugin, TFile, TFolder, addIcon, normalizePath } from 'obsidian'
+import { App, Notice, Plugin, PluginManifest, TFolder, addIcon } from 'obsidian'
 import { BookFusionPluginSettings, DEFAULT_SETTINGS } from './settings'
 import { BookFusionSettingsTab } from './settings_tab'
-import { BookPage, IndexPage, SyncTask } from './bookfusion_api'
+import { SyncTask } from './bookfusion_api'
 import logger from './logger'
 import ReportModal from './report_modal'
 import SyncReport from './sync_report'
 import logoSvg from '../logo.svg'
 import ConfirmationModal from './confirmation_modal'
+import PageProcessor from './pages_processor'
+import EventEmitter from './event_emitter'
 
 const SYNC_NOTICE_TEXT = '⏳ Sync in progress'
 
@@ -16,6 +18,42 @@ export class BookFusionPlugin extends Plugin {
   syncTimer: number | null
   syncTask: SyncTask
   syncReport: SyncReport
+  events: EventEmitter
+  pageProcessor: PageProcessor
+
+  constructor (app: App, manifest: PluginManifest) {
+    super(app, manifest)
+    this.events = new EventEmitter()
+    this.pageProcessor = new PageProcessor(this)
+
+    this.events.on('folderFailed', ({ dirPath }) => {
+      logger.log(`Folder \`${String(dirPath)}\` already exists.`)
+    })
+
+    this.events.on('indexFailed', ({ filePath, error }) => {
+      this.syncReport.indexFailed(filePath, error)
+      logger.error(error)
+      logger.log(this.syncTask.lastResponse)
+    })
+
+    this.events.on('bookCreated', ({ filePath }) => {
+      this.syncReport.bookCreated(filePath)
+    })
+
+    this.events.on('bookModified', ({ filePath }) => {
+      this.syncReport.bookModified(filePath)
+    })
+
+    this.events.on('bookFailed', ({ filePath, error }) => {
+      this.syncReport.bookFailed(filePath, error)
+      logger.error(error)
+      logger.log(this.syncTask.lastResponse)
+    })
+
+    this.events.on('highlightModified', ({ filePath, count }) => {
+      this.syncReport.highlightModified(filePath, count)
+    })
+  }
 
   async onload (): Promise<void> {
     logger.log('Plugin is loading')
@@ -91,19 +129,11 @@ export class BookFusionPlugin extends Plugin {
 
     try {
       for await (const page of this.syncTask.run(this.settings.cursor)) {
-        const dirPath = normalizePath(page.directory)
-        const directory = this.app.vault.getAbstractFileByPath(dirPath)
-        const filePath = normalizePath(`${dirPath}/${page.filename}`)
-
-        if (!(directory instanceof TFolder)) {
-          await this.tryCreateFolder(dirPath)
-        }
+        await this.pageProcessor.process(page)
 
         if (page.type === 'index') {
-          await this.createOrUpdateIndexPage(page as IndexPage, filePath)
           syncingNotice.setMessage(`${SYNC_NOTICE_TEXT}. Updating index pages.`)
         } else {
-          await this.createOrUpdateBookPage(page as BookPage, filePath)
           syncingNotice.setMessage(`${SYNC_NOTICE_TEXT}. ${++booksProcessed} book(s) processed`)
         }
 
@@ -135,139 +165,11 @@ export class BookFusionPlugin extends Plugin {
     syncingNotice.hide()
   }
 
-  private async createIndexPage (page: IndexPage, filePath: string): Promise<TFile> {
-    return await this.app.vault.create(filePath, String(page.content))
-  }
+  private async syncTimerHandler (): Promise<void> {
+    if (this.syncTask?.isRunning) return
 
-  private async modifyIndexPage (page: IndexPage, file: TFile): Promise<TFile> {
-    await this.app.vault.modify(file, String(page.content))
-
-    return file
-  }
-
-  private async createBookPage (page: BookPage, filePath: string): Promise<TFile> {
-    let content = String(page.content)
-
-    if (page.frontmatter != null) {
-      content = `---\n${page.frontmatter}\n---\n${content}\n`
-    }
-
-    if (page.highlights.length > 0) {
-      for (const highlight of page.highlights) {
-        if (highlight.directory != null && highlight.filename != null) {
-          // Atomic highlight strategy
-          const dirPath = normalizePath(highlight.directory)
-          const directory = this.app.vault.getAbstractFileByPath(dirPath)
-
-          if (!(directory instanceof TFolder)) {
-            await this.tryCreateFolder(dirPath)
-          }
-
-          await this.app.vault.create(normalizePath(`${dirPath}/${highlight.filename}`), highlight.content)
-        } else {
-          // Inline highlight strategy
-          if (highlight.chapter_heading != null) {
-            content += `${highlight.chapter_heading}\n`
-          }
-          content += `%%${highlight.id}%%\n${highlight.content}`
-        }
-      }
-
-      this.syncReport.highlightAdded(filePath, page.highlights.length)
-    }
-
-    const file = await this.app.vault.create(filePath, content)
-    this.syncReport.bookCreated(filePath)
-
-    return file
-  }
-
-  private async modifyBookPage (page: BookPage, file: TFile): Promise<TFile> {
-    if (page.highlights.length <= 0) {
-      return file
-    }
-
-    let highlightsAdded = 0
-
-    if (page.highlights[0].directory != null && page.highlights[0].filename != null) {
-      // Atomic highlight strategy
-      for (const highlight of page.highlights) {
-        const dirPath = normalizePath(String(highlight.directory))
-        const filePath = normalizePath(dirPath + '/' + String(highlight.filename))
-
-        if (this.app.vault.getAbstractFileByPath(dirPath) == null) {
-          await this.tryCreateFolder(dirPath)
-        }
-
-        if (this.app.vault.getAbstractFileByPath(filePath) == null) {
-          await this.app.vault.create(filePath, highlight.content)
-          highlightsAdded++
-        }
-      }
-    } else {
-      // Inline highlight strategy
-      const content = await this.app.vault.read(file)
-      const magicRegexp = /%%(highlight_.+)%%/g
-      const magicIds = new Set()
-      let match
-
-      while ((match = magicRegexp.exec(content)) != null) {
-        magicIds.add(match[1])
-      }
-
-      for (const highlight of page.highlights) {
-        if (!magicIds.has(highlight.id)) {
-          await this.app.vault.append(file, `%%${highlight.id}%%\n${highlight.content}`)
-          highlightsAdded++
-        }
-      }
-    }
-
-    if (highlightsAdded > 0) {
-      this.syncReport.highlightAdded(file.path, highlightsAdded)
-    }
-
-    return file
-  }
-
-  private async tryCreateFolder (dirPath: string): Promise<TFolder | undefined> {
-    try {
-      return await this.app.vault.createFolder(dirPath)
-    } catch {
-      logger.log(`Folder \`${dirPath}\` already exists.`)
-    }
-  }
-
-  private async createOrUpdateBookPage (page: BookPage, filePath: string): Promise<TFile | undefined> {
-    const file = this.app.vault.getAbstractFileByPath(filePath)
-
-    try {
-      if (file instanceof TFile) {
-        return await this.modifyBookPage(page, file)
-      } else {
-        return await this.createBookPage(page, filePath)
-      }
-    } catch (error) {
-      this.syncReport.bookFailed(filePath, error)
-      logger.error(error)
-      logger.log(this.syncTask.lastResponse)
-    }
-  }
-
-  private async createOrUpdateIndexPage (page: IndexPage, filePath: string): Promise<TFile | undefined> {
-    const file = this.app.vault.getAbstractFileByPath(filePath)
-
-    try {
-      if (file instanceof TFile) {
-        return await this.modifyIndexPage(page, file)
-      } else {
-        return await this.createIndexPage(page, filePath)
-      }
-    } catch (error) {
-      this.syncReport.indexFailed(filePath, error)
-      logger.error(error)
-      logger.log(this.syncTask.lastResponse)
-    }
+    await this.syncCommand()
+    await this.rescheduleSync()
   }
 
   scheduleSync (): void {
@@ -275,11 +177,7 @@ export class BookFusionPlugin extends Plugin {
 
     const timeout = this.settings.nextSyncAt - Date.now()
 
-    this.syncTimer = window.setTimeout(async () => {
-      if (this.syncTask?.isRunning) return
-      await this.syncCommand()
-      this.rescheduleSync()
-    }, timeout)
+    this.syncTimer = window.setTimeout(this.syncTimerHandler.bind(this), timeout)
   }
 
   async rescheduleSync (): Promise<void> {
@@ -295,5 +193,13 @@ export class BookFusionPlugin extends Plugin {
 
     clearTimeout(this.syncTimer)
     this.syncTimer = null
+  }
+
+  async tryCreateFolder (dirPath: string): Promise<TFolder | undefined> {
+    try {
+      return await this.app.vault.createFolder(dirPath)
+    } catch {
+      this.events.emit('folderFailed', { dirPath })
+    }
   }
 }
