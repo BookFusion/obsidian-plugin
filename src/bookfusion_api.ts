@@ -41,6 +41,15 @@ interface SyncResponse {
   next_sync_cursor: string | null
 }
 
+export class APIError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = this.constructor.name
+  }
+}
+
+export class SubscriptionRequiredError extends APIError {}
+
 export class SyncTask {
   abortController: AbortController
   isRunning: boolean = false
@@ -77,6 +86,11 @@ export class SyncTask {
         })
 
         if (!response.ok) {
+          if (response.status === 422) {
+            const errorMessage = await response.json()
+            throw new SubscriptionRequiredError(errorMessage.message)
+          }
+
           throw new Error('Something went wrong')
         }
 

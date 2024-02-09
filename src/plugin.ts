@@ -2,7 +2,7 @@
 import { App, Notice, Plugin, PluginManifest, TFolder, addIcon } from 'obsidian'
 import { BookFusionPluginSettings, DEFAULT_SETTINGS } from './settings'
 import { BookFusionSettingsTab } from './settings_tab'
-import { SyncTask } from './bookfusion_api'
+import { SubscriptionRequiredError, SyncTask } from './bookfusion_api'
 import logger from './logger'
 import ReportModal from './report_modal'
 import SyncReport from './sync_report'
@@ -152,7 +152,10 @@ export class BookFusionPlugin extends Plugin {
       this.settings.cursor = this.syncTask.lastResponse.next_sync_cursor
       await this.saveSettings()
     } catch (error) {
-      if (this.syncTask.isAborted) {
+      if (error instanceof SubscriptionRequiredError) {
+        new Notice('⬆️ ' + error.message)
+        logger.error(error)
+      } else if (this.syncTask.isAborted) {
         new Notice('🛑 Sync stopped by user')
         logger.log('Sync stopped by user')
       } else {
