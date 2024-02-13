@@ -28,6 +28,12 @@ export default class SyncReport {
       this.highlightsModified.size === 0
   }
 
+  isPrintable (): boolean {
+    return this.booksCreated.length !== 0 ||
+      this.booksModified.length !== 0 ||
+      this.highlightsModified.size !== 0
+  }
+
   indexFailed (path: string | null, error: Error): void {
     this.indicesFailed.push({ path, error })
   }
@@ -44,8 +50,8 @@ export default class SyncReport {
     this.booksFailed.push({ path, error })
   }
 
-  highlightModified (path: string, offset: number = 1): void {
-    const value = this.highlightsModified.get(path) ?? 0
-    this.highlightsModified.set(path, value + offset)
+  highlightModified (bookPath: string): void {
+    let value = this.highlightsModified.get(bookPath) ?? 0
+    this.highlightsModified.set(bookPath, ++value)
   }
 }

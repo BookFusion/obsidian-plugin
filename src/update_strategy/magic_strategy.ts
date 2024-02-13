@@ -11,7 +11,7 @@ export default class MagicStrategy extends UpdateStrategy {
     const isAtomic = highlights[0]?.directory != null && highlights[0]?.filename != null
 
     if (isAtomic) {
-      await this.replaceAtomicHighlights(highlights)
+      await this.replaceAtomicHighlights(highlights, file)
     } else {
       await this.replaceHighlights(highlights, file)
     }
@@ -35,7 +35,7 @@ export default class MagicStrategy extends UpdateStrategy {
     await this.app.vault.modify(file, content)
   }
 
-  private async replaceAtomicHighlights (highlights: HighlightBlock[]): Promise<void> {
+  private async replaceAtomicHighlights (highlights: HighlightBlock[], file: TFile): Promise<void> {
     for (const highlight of highlights) {
       const dirPath = normalizePath(String(highlight.directory))
       const filePath = normalizePath(dirPath + '/' + String(highlight.filename))
@@ -44,14 +44,14 @@ export default class MagicStrategy extends UpdateStrategy {
         await this.plugin.tryCreateFolder(dirPath)
       }
 
-      const file = this.app.vault.getAbstractFileByPath(filePath)
+      const highlightFile = this.app.vault.getAbstractFileByPath(filePath)
 
-      if (file instanceof TFile) {
-        await this.app.vault.modify(file, highlight.content)
-        this.plugin.events.emit('highlightModified', { filePath })
-      } else if (file == null) {
+      if (highlightFile instanceof TFile) {
+        await this.app.vault.modify(highlightFile, highlight.content)
+        this.plugin.events.emit('highlightModified', { filePath: file.path })
+      } else if (highlightFile == null) {
         await this.app.vault.create(filePath, highlight.content)
-        this.plugin.events.emit('highlightModified', { filePath })
+        this.plugin.events.emit('highlightModified', { filePath: file.path })
       }
     }
   }
@@ -80,6 +80,6 @@ export default class MagicStrategy extends UpdateStrategy {
 
     await this.app.vault.modify(file, content)
 
-    this.plugin.events.emit('highlightModified', { filePath: file.path, count: highlights.length })
+    this.plugin.events.emit('highlightModified', { filePath: file.path })
   }
 }

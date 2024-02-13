@@ -10,6 +10,7 @@ import logoSvg from '../logo.svg'
 import ConfirmationModal from './confirmation_modal'
 import PageProcessor from './pages_processor'
 import EventEmitter from './event_emitter'
+import SyncReportPrinter from './sync_report_printer'
 
 const SYNC_NOTICE_TEXT = '⏳ Sync in progress'
 
@@ -50,8 +51,8 @@ export class BookFusionPlugin extends Plugin {
       logger.log(this.syncTask.lastResponse)
     })
 
-    this.events.on('highlightModified', ({ filePath, count }) => {
-      this.syncReport.highlightModified(filePath, count)
+    this.events.on('highlightModified', ({ filePath }) => {
+      this.syncReport.highlightModified(filePath)
     })
   }
 
@@ -147,6 +148,7 @@ export class BookFusionPlugin extends Plugin {
       }
 
       new ReportModal(this.app).display(this.syncReport)
+      new SyncReportPrinter(this.app).append(this.syncReport)
       logger.log('Sync completed')
 
       this.settings.cursor = this.syncTask.lastResponse.next_sync_cursor

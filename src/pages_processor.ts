@@ -96,9 +96,9 @@ export default class PageProcessor {
           }
           content += wrapWithMagicComment(highlight.id, highlight.content)
         }
-      }
 
-      this.plugin.events.emit('highlightModified', { filePath, count: page.highlights.length })
+        this.plugin.events.emit('highlightModified', { filePath })
+      }
     }
 
     const file = await this.app.vault.create(filePath, content)

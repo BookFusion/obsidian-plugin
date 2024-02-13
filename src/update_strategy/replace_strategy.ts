@@ -67,6 +67,6 @@ export default class ReplaceStrategy extends UpdateStrategy {
       await this.app.vault.append(file, content)
     }
 
-    this.plugin.events.emit('highlightModified', { filePath: file.path, count: highlights.length })
+    this.plugin.events.emit('highlightModified', { filePath: file.path })
   }
 }

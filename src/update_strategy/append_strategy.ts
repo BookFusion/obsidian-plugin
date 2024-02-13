@@ -14,7 +14,7 @@ export default class AppendStrategy extends UpdateStrategy {
     const isAtomic = highlights[0].directory != null && highlights[0].filename != null
 
     if (isAtomic) {
-      await this.appendAtomicHighlights(highlights)
+      await this.appendAtomicHighlights(highlights, file)
     } else {
       await this.appendHighlights(highlights, file)
     }
@@ -22,7 +22,7 @@ export default class AppendStrategy extends UpdateStrategy {
     return file
   }
 
-  private async appendAtomicHighlights (highlights: HighlightBlock[]): Promise<void> {
+  private async appendAtomicHighlights (highlights: HighlightBlock[], file: TFile): Promise<void> {
     for (const highlight of highlights) {
       const dirPath = normalizePath(String(highlight.directory))
       const filePath = normalizePath(dirPath + '/' + String(highlight.filename))
@@ -33,7 +33,7 @@ export default class AppendStrategy extends UpdateStrategy {
 
       if (this.app.vault.getAbstractFileByPath(filePath) == null) {
         await this.app.vault.create(filePath, highlight.content)
-        this.plugin.events.emit('highlightModified', { filePath })
+        this.plugin.events.emit('highlightModified', { filePath: file.path })
       }
     }
   }
@@ -58,7 +58,7 @@ export default class AppendStrategy extends UpdateStrategy {
     }
 
     if (highlightsAdded > 0) {
-      this.plugin.events.emit('highlightModified', { filePath: file, count: highlightsAdded })
+      this.plugin.events.emit('highlightModified', { filePath: file.path })
     }
   }
 }
