@@ -113,7 +113,7 @@ export class BookFusionPlugin extends Plugin {
     }
   }
 
-  private async syncCommand (): Promise<void> {
+  private async syncCommand (isScheduled = false): Promise<void> {
     if (this.settings.token == null) {
       new Notice('🛑 First you need to configure the plugin')
       return
@@ -147,7 +147,10 @@ export class BookFusionPlugin extends Plugin {
         new Notice(message)
       }
 
-      new ReportModal(this.app).display(this.syncReport)
+      if (!isScheduled) {
+        new ReportModal(this.app).display(this.syncReport)
+      }
+
       new SyncReportPrinter(this.app).append(this.syncReport)
       logger.log('Sync completed')
 
@@ -173,7 +176,7 @@ export class BookFusionPlugin extends Plugin {
   private async syncTimerHandler (): Promise<void> {
     if (this.syncTask?.isRunning) return
 
-    await this.syncCommand()
+    await this.syncCommand(true)
     await this.rescheduleSync()
   }
 
