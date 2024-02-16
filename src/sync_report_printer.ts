@@ -19,7 +19,7 @@ export default class SyncReportPrinter {
       throw new Error('There is folder instead of file.')
     }
 
-    this.app.vault.append(file as TFile, this.format(report))
+    await this.app.vault.append(file as TFile, this.format(report))
   }
 
   private format (report: SyncReport): string {
@@ -27,7 +27,7 @@ export default class SyncReportPrinter {
       return ''
     }
 
-    const groupedByPath = new Map()
+    const groupedByPath = new Map<string, number>()
 
     report.booksCreated.forEach(({ path }) => groupedByPath.set(path, 0))
     report.booksModified.forEach(({ path }) => groupedByPath.set(path, 0))

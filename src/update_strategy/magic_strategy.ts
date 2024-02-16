@@ -1,7 +1,13 @@
 import { TFile, normalizePath } from 'obsidian'
 import { BookPage, HighlightBlock } from 'src/bookfusion_api'
 import UpdateStrategy from './update_strategy'
-import { wrapWithMagicComment } from 'src/utils'
+import { DoublyLinkedList, ListNode, wrapWithMagicComment } from 'src/utils'
+
+interface ExtractedHighlight {
+  id: string
+  index: number
+  text: string
+}
 
 export default class MagicStrategy extends UpdateStrategy {
   async modifyBookPage (page: BookPage, file: TFile): Promise<TFile> {
@@ -61,25 +67,80 @@ export default class MagicStrategy extends UpdateStrategy {
       return
     }
 
-    let content = await this.app.vault.read(file)
-    const magicRegexp = /%%begin-(highlight-.+)%%/g
-    const magicIds = new Set()
-    let match
+    const content = await this.app.vault.read(file)
+    const slices = this.extractHighlightFragments(content)
+    const nodesMap = new Map<string, ListNode<ExtractedHighlight>>()
+    const nodesDLL = new DoublyLinkedList<ExtractedHighlight>()
 
-    while ((match = magicRegexp.exec(content)) != null) {
-      magicIds.add(match[1])
+    slices.forEach((value) => {
+      nodesMap.set(value.id, nodesDLL.append(value))
+    })
+
+    for (const highlight of highlights.reverse()) {
+      let highlightContent
+      if (highlight.chapter_heading != null) {
+        highlightContent = `${highlight.chapter_heading}\n${highlight.content}`
+      } else {
+        highlightContent = highlight.content
+      }
+
+      let target = nodesMap.get(highlight.id)
+
+      if (target != null) {
+        target.value.text = this.replaceBlock(target.value.text, highlight.id, highlightContent)
+        continue
+      }
+
+      const value = { id: highlight.id, index: -1, text: wrapWithMagicComment(highlight.id, highlightContent) }
+
+      if (highlight.next != null) {
+        target = nodesMap.get(highlight.next)
+      }
+      if (target != null) {
+        nodesMap.set(highlight.id, nodesDLL.insertBefore(target, value))
+        continue
+      }
+
+      if (highlight.previous != null) {
+        target = nodesMap.get(highlight.previous)
+      }
+      if (target != null) {
+        nodesMap.set(highlight.id, nodesDLL.insertAfter(target, value))
+        continue
+      }
+
+      nodesMap.set(highlight.id, nodesDLL.append(value))
     }
 
-    for (const highlight of highlights) {
-      if (magicIds.has(highlight.id)) {
-        content = this.replaceBlock(content, highlight.id, highlight.content)
-      } else {
-        content += wrapWithMagicComment(highlight.id, highlight.content)
+    let modifiedContent = content.slice(0, slices[0]?.index)
+
+    for (const value of nodesDLL) {
+      modifiedContent += value.text
+
+      if (!modifiedContent.endsWith("\n")) {
+        modifiedContent += "\n"
       }
     }
 
-    await this.app.vault.modify(file, content)
+    await this.app.vault.modify(file, modifiedContent)
 
     this.plugin.events.emit('highlightModified', { filePath: file.path })
+  }
+
+  private extractHighlightFragments (text: string): ExtractedHighlight[] {
+    const matches = Array.from(text.matchAll(/%%begin-(?<id>highlight-.+)%%/g))
+    const result = []
+
+    for (let i = 0; i < matches.length; i++) {
+      const match = matches[i]
+
+      result.push({
+        id: String(match.groups?.id),
+        index: Number(match.index),
+        text: text.slice(match.index, matches[i + 1]?.index)
+      })
+    }
+
+    return result
   }
 }

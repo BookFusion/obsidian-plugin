@@ -29,6 +29,14 @@ export interface HighlightBlock {
   chapter_heading: string | null
   directory: string | null
   filename: string | null
+  /**
+   * For Magic update policy. Block id of previous expected highlight.
+   */
+  previous: string | null
+  /**
+   * For Magic update policy. Block id of next expected highlight.
+   */
+  next: string | null
 }
 
 interface SyncOptions {
@@ -42,8 +50,8 @@ interface SyncResponse {
 }
 
 export class APIError extends Error {
-  constructor(message: string) {
-    super(message);
+  constructor (message: string) {
+    super(message)
     this.name = this.constructor.name
   }
 }

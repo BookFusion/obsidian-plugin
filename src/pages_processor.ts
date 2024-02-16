@@ -92,9 +92,10 @@ export default class PageProcessor {
         } else {
           // Inline highlight strategy
           if (highlight.chapter_heading != null) {
-            content += `${highlight.chapter_heading}\n`
+            content += wrapWithMagicComment(highlight.id, `${highlight.chapter_heading}\n${highlight.content}`)
+          } else {
+            content += wrapWithMagicComment(highlight.id, highlight.content)
           }
-          content += wrapWithMagicComment(highlight.id, highlight.content)
         }
 
         this.plugin.events.emit('highlightModified', { filePath })
