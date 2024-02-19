@@ -1,7 +1,7 @@
 import { TFile, normalizePath } from 'obsidian'
 import { BookPage, HighlightBlock } from 'src/bookfusion_api'
 import UpdateStrategy from './update_strategy'
-import { DoublyLinkedList, ListNode, wrapWithMagicComment } from 'src/utils'
+import { DoublyLinkedList, ListNode, replaceBlock, wrapWithMagicComment } from 'src/utils'
 
 interface ExtractedHighlight {
   id: string
@@ -25,20 +25,14 @@ export default class MagicStrategy extends UpdateStrategy {
     return file
   }
 
-  private replaceBlock (content: string, id: string, fragment: string): string {
-    const regexp = new RegExp(`%%begin-${id}%%[\\s\\S]*?%%end-${id}%%\\n{0,2}`)
-    return content.replace(regexp, () => wrapWithMagicComment(id, fragment))
-  }
-
   private async replaceBook (page: BookPage, file: TFile): Promise<void> {
-    let content = await this.app.vault.read(file)
+    const content = await this.app.vault.read(file)
+    const newContent = replaceBlock(content, page.id, String(page.content))
 
-    if (content !== page.content) {
-      content = this.replaceBlock(content, page.id, String(page.content))
+    if (content.trim() !== newContent.trim()) {
+      await this.app.vault.modify(file, newContent)
       this.plugin.events.emit('bookModified', { filePath: file.path })
     }
-
-    await this.app.vault.modify(file, content)
   }
 
   private async replaceAtomicHighlights (highlights: HighlightBlock[], file: TFile): Promise<void> {
@@ -53,10 +47,15 @@ export default class MagicStrategy extends UpdateStrategy {
       const highlightFile = this.app.vault.getAbstractFileByPath(filePath)
 
       if (highlightFile instanceof TFile) {
-        await this.app.vault.modify(highlightFile, highlight.content)
-        this.plugin.events.emit('highlightModified', { filePath: file.path })
+        const content = await this.app.vault.read(highlightFile)
+        const newContent = replaceBlock(content, highlight.id, highlight.content)
+
+        if (content.trim() !== newContent.trim()) {
+          await this.app.vault.modify(highlightFile, newContent)
+          this.plugin.events.emit('highlightModified', { filePath: file.path })
+        }
       } else if (highlightFile == null) {
-        await this.app.vault.create(filePath, highlight.content)
+        await this.app.vault.create(filePath, wrapWithMagicComment(highlight.id, highlight.content))
         this.plugin.events.emit('highlightModified', { filePath: file.path })
       }
     }
@@ -87,7 +86,7 @@ export default class MagicStrategy extends UpdateStrategy {
       let target = nodesMap.get(highlight.id)
 
       if (target != null) {
-        target.value.text = this.replaceBlock(target.value.text, highlight.id, highlightContent)
+        target.value.text = replaceBlock(target.value.text, highlight.id, highlightContent)
         continue
       }
 

@@ -2,6 +2,11 @@ export function wrapWithMagicComment (id: string, content: string): string {
   return `%%begin-${id}%%\n${content}\n%%end-${id}%%\n\n`
 }
 
+export function replaceBlock (content: string, id: string, fragment: string): string {
+  const regexp = new RegExp(`%%begin-${id}%%[\\s\\S]*?%%end-${id}%%\\n{0,2}`)
+  return content.replace(regexp, () => wrapWithMagicComment(id, fragment))
+}
+
 export class ListNode<T> {
   value: T
   previous: ListNode<T> | null = null
