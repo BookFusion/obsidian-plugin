@@ -117,8 +117,8 @@ export default class MagicStrategy extends UpdateStrategy {
     for (const value of nodesDLL) {
       modifiedContent += value.text
 
-      if (!modifiedContent.endsWith("\n")) {
-        modifiedContent += "\n"
+      if (!modifiedContent.endsWith('\n')) {
+        modifiedContent += '\n'
       }
     }
 

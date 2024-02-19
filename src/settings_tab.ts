@@ -94,6 +94,14 @@ export class BookFusionSettingsTab extends PluginSettingTab {
           dropdownComponent.setValue(String(this.plugin.settings.syncInterval / MS_IN_MINUTE))
         }
       })
+
+    new Setting(this.containerEl)
+      .setName('Enable Sync Log')
+      .addToggle((toggleComponent) => {
+        toggleComponent
+          .setValue(Boolean(this.plugin.settings.syncLogEnabled))
+          .onChange(this.toggleSyncLog.bind(this))
+      })
   }
 
   private connect (): void {
@@ -130,6 +138,13 @@ export class BookFusionSettingsTab extends PluginSettingTab {
       this.plugin.settings.syncInterval = null
       this.plugin.settings.nextSyncAt = null
     }
+
+    await this.plugin.saveSettings()
+    this.display()
+  }
+
+  private async toggleSyncLog (value: boolean): Promise<void> {
+    this.plugin.settings.syncLogEnabled = value
 
     await this.plugin.saveSettings()
     this.display()

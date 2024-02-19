@@ -151,7 +151,10 @@ export class BookFusionPlugin extends Plugin {
         new ReportModal(this.app).display(this.syncReport)
       }
 
-      void new SyncReportPrinter(this.app).append(this.syncReport)
+      if (this.settings.syncLogEnabled ?? false) {
+        void new SyncReportPrinter(this.app).append(this.syncReport)
+      }
+
       logger.log('Sync completed')
 
       this.settings.cursor = this.syncTask.lastResponse.next_sync_cursor

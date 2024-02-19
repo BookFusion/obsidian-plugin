@@ -33,7 +33,7 @@ export class DoublyLinkedList<T> implements Iterable<T> {
   }
 
   append (value: any): ListNode<T> {
-    if (this.tail) {
+    if (this.tail != null) {
       return this.insertAfter(this.tail, value)
     } else {
       const node = new ListNode<any>(value)
