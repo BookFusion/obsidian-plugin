@@ -1,3 +1,5 @@
+import { AtomicHighlightPage, HighlightBlock } from './bookfusion_api'
+
 export function wrapWithMagicComment (id: string, content: string): string {
   return `%%begin-${id}%%\n${content}\n%%end-${id}%%\n\n`
 }
@@ -5,6 +7,22 @@ export function wrapWithMagicComment (id: string, content: string): string {
 export function replaceBlock (content: string, id: string, fragment: string): string {
   const regexp = new RegExp(`%%begin-${id}%%[\\s\\S]*?%%end-${id}%%\\n{0,2}`)
   return content.replace(regexp, () => wrapWithMagicComment(id, fragment))
+}
+
+export function formatHighlightLink (highlight: AtomicHighlightPage): string {
+  if (highlight.chapter_heading != null) {
+    return `${highlight.chapter_heading}\n${highlight.link}`
+  } else {
+    return highlight.link
+  }
+}
+
+export function formatHighlightContent (highlight: HighlightBlock): string {
+  if (highlight.chapter_heading != null) {
+    return `${highlight.chapter_heading}\n${highlight.content}`
+  } else {
+    return highlight.content
+  }
 }
 
 export class ListNode<T> {

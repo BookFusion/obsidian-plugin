@@ -16,7 +16,8 @@ export interface BookPage extends Page {
   id: string
   type: 'book'
   frontmatter: string | null
-  highlights: HighlightBlock[]
+  highlights: SomeHighlight[]
+  atomic_highlights: boolean
 }
 
 export interface IndexPage extends Page {
@@ -27,8 +28,6 @@ export interface HighlightBlock {
   id: string
   content: string
   chapter_heading: string | null
-  directory: string | null
-  filename: string | null
   /**
    * For Magic update policy. Block id of previous expected highlight.
    */
@@ -38,6 +37,14 @@ export interface HighlightBlock {
    */
   next: string | null
 }
+
+export interface AtomicHighlightPage extends HighlightBlock {
+  directory: string
+  filename: string
+  link: string
+}
+
+export type SomeHighlight = HighlightBlock | AtomicHighlightPage
 
 interface SyncOptions {
   token: string

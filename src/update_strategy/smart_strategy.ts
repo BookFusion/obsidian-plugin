@@ -1,7 +1,8 @@
-import { TFile, normalizePath } from 'obsidian'
-import { BookPage, HighlightBlock } from 'src/bookfusion_api'
+import { App, TFile, normalizePath } from 'obsidian'
+import { AtomicHighlightPage, BookPage, HighlightBlock, SomeHighlight } from 'src/bookfusion_api'
 import UpdateStrategy from './update_strategy'
-import { DoublyLinkedList, ListNode, replaceBlock, wrapWithMagicComment } from 'src/utils'
+import { DoublyLinkedList, ListNode, formatHighlightLink, replaceBlock, wrapWithMagicComment } from 'src/utils'
+import BookFusionPlugin from 'main'
 
 interface ExtractedHighlight {
   id: string
@@ -9,17 +10,31 @@ interface ExtractedHighlight {
   text: string
 }
 
-export default class MagicStrategy extends UpdateStrategy {
+export default class SmartStrategy extends UpdateStrategy {
+  replace: boolean
+
+  constructor (plugin: BookFusionPlugin, app: App, replace: boolean = true) {
+    super(plugin, app)
+
+    this.replace = replace
+  }
+
   async modifyBookPage (page: BookPage, file: TFile): Promise<TFile> {
-    await this.replaceBook(page, file)
+    if (this.replace) {
+      await this.replaceBook(page, file)
+    }
 
     const { highlights } = page
-    const isAtomic = highlights[0]?.directory != null && highlights[0]?.filename != null
 
-    if (isAtomic) {
-      await this.replaceAtomicHighlights(highlights, file)
+    if (page.atomic_highlights) {
+      await this.replaceAtomicHighlights(highlights as AtomicHighlightPage[], file)
+
+      const content = await this.app.vault.read(file)
+      const modifiedContent = this.updateContentWith(content, highlights, formatHighlightLink)
+
+      await this.app.vault.modify(file, modifiedContent)
     } else {
-      await this.replaceHighlights(highlights, file)
+      await this.replaceHighlights(highlights as HighlightBlock[], file)
     }
 
     return file
@@ -35,7 +50,7 @@ export default class MagicStrategy extends UpdateStrategy {
     }
   }
 
-  private async replaceAtomicHighlights (highlights: HighlightBlock[], file: TFile): Promise<void> {
+  private async replaceAtomicHighlights (highlights: AtomicHighlightPage[], file: TFile): Promise<void> {
     for (const highlight of highlights) {
       const dirPath = normalizePath(String(highlight.directory))
       const filePath = normalizePath(dirPath + '/' + String(highlight.filename))
@@ -47,6 +62,8 @@ export default class MagicStrategy extends UpdateStrategy {
       const highlightFile = this.app.vault.getAbstractFileByPath(filePath)
 
       if (highlightFile instanceof TFile) {
+        if (!this.replace) continue
+
         const content = await this.app.vault.read(highlightFile)
         const newContent = replaceBlock(content, highlight.id, highlight.content)
 
@@ -67,6 +84,14 @@ export default class MagicStrategy extends UpdateStrategy {
     }
 
     const content = await this.app.vault.read(file)
+    const modifiedContent = this.updateContentWith(content, highlights, formatHighlightLink)
+
+    await this.app.vault.modify(file, modifiedContent)
+
+    this.plugin.events.emit('highlightModified', { filePath: file.path })
+  }
+
+  private updateContentWith (content: string, highlights: SomeHighlight[], formatter: (highlight: SomeHighlight) => string): string {
     const slices = this.extractHighlightFragments(content)
     const nodesMap = new Map<string, ListNode<ExtractedHighlight>>()
     const nodesDLL = new DoublyLinkedList<ExtractedHighlight>()
@@ -76,16 +101,10 @@ export default class MagicStrategy extends UpdateStrategy {
     })
 
     for (const highlight of highlights.reverse()) {
-      let highlightContent
-      if (highlight.chapter_heading != null) {
-        highlightContent = `${highlight.chapter_heading}\n${highlight.content}`
-      } else {
-        highlightContent = highlight.content
-      }
-
+      const highlightContent = formatter(highlight)
       let target = nodesMap.get(highlight.id)
 
-      if (target != null) {
+      if (this.replace && target != null) {
         target.value.text = replaceBlock(target.value.text, highlight.id, highlightContent)
         continue
       }
@@ -121,9 +140,7 @@ export default class MagicStrategy extends UpdateStrategy {
       }
     }
 
-    await this.app.vault.modify(file, modifiedContent)
-
-    this.plugin.events.emit('highlightModified', { filePath: file.path })
+    return modifiedContent
   }
 
   private extractHighlightFragments (text: string): ExtractedHighlight[] {

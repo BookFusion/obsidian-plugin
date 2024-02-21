@@ -1,11 +1,11 @@
 import { App, TFile, TFolder, normalizePath } from 'obsidian'
-import { BookPage, IndexPage, Page } from './bookfusion_api'
+import { AtomicHighlightPage, BookPage, HighlightBlock, IndexPage, Page } from './bookfusion_api'
 import { BookFusionPlugin } from './plugin'
 import AppendStrategy from './update_strategy/append_strategy'
 import ReplaceStrategy from './update_strategy/replace_strategy'
 import UpdateStrategy from './update_strategy/update_strategy'
-import { wrapWithMagicComment } from './utils'
-import MagicStrategy from './update_strategy/magic_strategy'
+import { formatHighlightContent, formatHighlightLink, wrapWithMagicComment } from './utils'
+import SmartStrategy from './update_strategy/smart_strategy'
 
 export default class PageProcessor {
   app: App
@@ -78,9 +78,10 @@ export default class PageProcessor {
     }
 
     if (page.highlights.length > 0) {
-      for (const highlight of page.highlights) {
-        if (highlight.directory != null && highlight.filename != null) {
-          // Atomic highlight strategy
+      if (page.atomic_highlights) {
+        for (const highlight of page.highlights as AtomicHighlightPage[]) {
+          content += wrapWithMagicComment(highlight.id, formatHighlightLink(highlight))
+
           const dirPath = normalizePath(highlight.directory)
           const directory = this.app.vault.getAbstractFileByPath(dirPath)
 
@@ -89,16 +90,15 @@ export default class PageProcessor {
           }
 
           await this.app.vault.create(normalizePath(`${dirPath}/${highlight.filename}`), highlight.content)
-        } else {
-          // Inline highlight strategy
-          if (highlight.chapter_heading != null) {
-            content += wrapWithMagicComment(highlight.id, `${highlight.chapter_heading}\n${highlight.content}`)
-          } else {
-            content += wrapWithMagicComment(highlight.id, highlight.content)
-          }
-        }
 
-        this.plugin.events.emit('highlightModified', { filePath })
+          this.plugin.events.emit('highlightModified', { filePath })
+        }
+      } else {
+        for (const highlight of page.highlights as HighlightBlock[]) {
+          content += wrapWithMagicComment(highlight.id, formatHighlightContent(highlight))
+
+          this.plugin.events.emit('highlightModified', { filePath })
+        }
       }
     }
 
@@ -118,7 +118,9 @@ export default class PageProcessor {
       case 'replace':
         return new ReplaceStrategy(this.plugin, this.app)
       case 'magic':
-        return new MagicStrategy(this.plugin, this.app)
+        return new SmartStrategy(this.plugin, this.app, true)
+      case 'insert':
+        return new SmartStrategy(this.plugin, this.app, false)
       case 'append':
       default:
         return new AppendStrategy(this.plugin, this.app)

@@ -1,19 +1,27 @@
 import { TFile, normalizePath } from 'obsidian'
-import { BookPage, HighlightBlock } from 'src/bookfusion_api'
+import { AtomicHighlightPage, BookPage, HighlightBlock, SomeHighlight } from 'src/bookfusion_api'
 import UpdateStrategy from './update_strategy'
-import { wrapWithMagicComment } from 'src/utils'
+import { formatHighlightContent, formatHighlightLink, wrapWithMagicComment } from 'src/utils'
 
 export default class ReplaceStrategy extends UpdateStrategy {
   async modifyBookPage (page: BookPage, file: TFile): Promise<TFile> {
     await this.replaceBook(page, file)
 
     const { highlights } = page
-    const isAtomic = highlights[0]?.directory != null && highlights[0]?.filename != null
 
-    if (isAtomic) {
-      await this.replaceAtomicHighlights(highlights)
+    if (page.atomic_highlights) {
+      const formatter = (highlight: AtomicHighlightPage): string => {
+        return wrapWithMagicComment(highlight.id, formatHighlightLink(highlight))
+      }
+
+      await this.appendHighlights(highlights as HighlightBlock[], file, formatter)
+      await this.replaceAtomicHighlights(highlights as AtomicHighlightPage[])
     } else {
-      await this.appendHighlights(highlights, file)
+      const formatter = (highlight: HighlightBlock): string => {
+        return wrapWithMagicComment(highlight.id, formatHighlightContent(highlight))
+      }
+
+      await this.appendHighlights(highlights as HighlightBlock[], file, formatter)
     }
 
     return file
@@ -31,7 +39,7 @@ export default class ReplaceStrategy extends UpdateStrategy {
     this.plugin.events.emit('bookModified', { filePath: file.path })
   }
 
-  private async replaceAtomicHighlights (highlights: HighlightBlock[]): Promise<void> {
+  private async replaceAtomicHighlights (highlights: AtomicHighlightPage[]): Promise<void> {
     for (const highlight of highlights) {
       const dirPath = normalizePath(String(highlight.directory))
       const filePath = normalizePath(dirPath + '/' + String(highlight.filename))
@@ -40,33 +48,24 @@ export default class ReplaceStrategy extends UpdateStrategy {
         await this.plugin.tryCreateFolder(dirPath)
       }
 
-      const file = this.app.vault.getAbstractFileByPath(filePath)
+      const highlightFile = this.app.vault.getAbstractFileByPath(filePath)
 
-      if (file instanceof TFile) {
-        await this.app.vault.modify(file, highlight.content)
-        this.plugin.events.emit('highlightModified', { filePath })
-      } else if (file == null) {
+      if (highlightFile instanceof TFile) {
+        await this.app.vault.modify(highlightFile, highlight.content)
+      } else if (highlightFile == null) {
         await this.app.vault.create(filePath, highlight.content)
-        this.plugin.events.emit('highlightModified', { filePath })
       }
     }
   }
 
-  private async appendHighlights (highlights: HighlightBlock[], file: TFile): Promise<void> {
+  private async appendHighlights (highlights: SomeHighlight[], file: TFile, formatter: (highlight: SomeHighlight) => string): Promise<void> {
     if (highlights.length === 0) {
       return
     }
 
     for (const highlight of highlights) {
-      let content = wrapWithMagicComment(highlight.id, highlight.content)
-
-      if (highlight.chapter_heading != null) {
-        content = `${highlight.chapter_heading}\n${content}`
-      }
-
-      await this.app.vault.append(file, content)
+      await this.app.vault.append(file, formatter(highlight))
+      this.plugin.events.emit('highlightModified', { filePath: file.path })
     }
-
-    this.plugin.events.emit('highlightModified', { filePath: file.path })
   }
 }

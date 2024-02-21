@@ -1,5 +1,5 @@
 import { TFile, normalizePath } from 'obsidian'
-import { BookPage, HighlightBlock } from 'src/bookfusion_api'
+import { AtomicHighlightPage, BookPage, HighlightBlock } from 'src/bookfusion_api'
 import UpdateStrategy from './update_strategy'
 import { wrapWithMagicComment } from 'src/utils'
 
@@ -11,18 +11,21 @@ export default class AppendStrategy extends UpdateStrategy {
       return file
     }
 
-    const isAtomic = highlights[0].directory != null && highlights[0].filename != null
+    if (page.atomic_highlights) {
+      const formatter = (highlight: AtomicHighlightPage): string => wrapWithMagicComment(highlight.id, highlight.link)
 
-    if (isAtomic) {
-      await this.appendAtomicHighlights(highlights, file)
+      await this.appendAtomicHighlights(highlights as AtomicHighlightPage[], file)
+      await this.appendHighlights(highlights as AtomicHighlightPage[], file, formatter)
     } else {
-      await this.appendHighlights(highlights, file)
+      const formatter = (highlight: HighlightBlock): string => wrapWithMagicComment(highlight.id, highlight.content)
+
+      await this.appendHighlights(highlights as HighlightBlock[], file, formatter)
     }
 
     return file
   }
 
-  private async appendAtomicHighlights (highlights: HighlightBlock[], file: TFile): Promise<void> {
+  private async appendAtomicHighlights (highlights: AtomicHighlightPage[], file: TFile): Promise<void> {
     for (const highlight of highlights) {
       const dirPath = normalizePath(String(highlight.directory))
       const filePath = normalizePath(dirPath + '/' + String(highlight.filename))
@@ -38,7 +41,7 @@ export default class AppendStrategy extends UpdateStrategy {
     }
   }
 
-  private async appendHighlights (highlights: HighlightBlock[], file: TFile): Promise<void> {
+  private async appendHighlights (highlights: HighlightBlock[], file: TFile, formatter: (highlight: HighlightBlock) => string): Promise<void> {
     const content = await this.app.vault.read(file)
     const magicRegexp = /%%begin-(highlight-.+)%%/g
     const magicIds = new Set()
@@ -51,8 +54,7 @@ export default class AppendStrategy extends UpdateStrategy {
 
     for (const highlight of highlights) {
       if (!magicIds.has(highlight.id)) {
-        const content = wrapWithMagicComment(highlight.id, highlight.content)
-        await this.app.vault.append(file, content)
+        await this.app.vault.append(file, formatter(highlight))
         highlightsAdded++
       }
     }

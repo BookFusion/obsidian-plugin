@@ -2,7 +2,7 @@ import BookFusionPlugin from 'main'
 import { App, TFile } from 'obsidian'
 import { BookPage } from 'src/bookfusion_api'
 
-export type UpdateStrategyId = 'append' | 'replace' | 'magic'
+export type UpdateStrategyId = 'append' | 'replace' | 'magic' | 'insert'
 
 export default abstract class UpdateStrategy {
   plugin: BookFusionPlugin
