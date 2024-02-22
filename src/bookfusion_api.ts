@@ -63,8 +63,6 @@ export class APIError extends Error {
   }
 }
 
-export class SubscriptionRequiredError extends APIError {}
-
 export class SyncTask {
   abortController: AbortController
   isRunning: boolean = false
@@ -101,12 +99,13 @@ export class SyncTask {
         })
 
         if (!response.ok) {
-          if (response.status === 422) {
-            const errorMessage = await response.json()
-            throw new SubscriptionRequiredError(errorMessage.message)
+          let errorMessage
+          try {
+            errorMessage = await response.json()
+          } catch {
+            throw new Error('Something went wrong')
           }
-
-          throw new Error('Something went wrong')
+          throw new APIError(errorMessage.message)
         }
 
         const data: SyncResponse = await response.json()
