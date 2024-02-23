@@ -60,7 +60,7 @@ export default class AppendStrategy extends UpdateStrategy {
     }
 
     if (highlightsAdded > 0) {
-      this.plugin.events.emit('highlightModified', { filePath: file.path })
+      this.plugin.events.emit('highlightModified', { filePath: file.path, count: highlightsAdded })
     }
   }
 }

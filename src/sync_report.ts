@@ -50,8 +50,8 @@ export default class SyncReport {
     this.booksFailed.push({ path, error })
   }
 
-  highlightModified (bookPath: string): void {
-    let value = this.highlightsModified.get(bookPath) ?? 0
-    this.highlightsModified.set(bookPath, ++value)
+  highlightModified (bookPath: string, count: number = 1): void {
+    const value = this.highlightsModified.get(bookPath) ?? 0
+    this.highlightsModified.set(bookPath, value + count)
   }
 }

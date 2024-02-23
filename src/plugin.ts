@@ -51,8 +51,8 @@ export class BookFusionPlugin extends Plugin {
       logger.log(this.syncTask.lastResponse)
     })
 
-    this.events.on('highlightModified', ({ filePath }) => {
-      this.syncReport.highlightModified(filePath)
+    this.events.on('highlightModified', ({ filePath, count = 1 }) => {
+      this.syncReport.highlightModified(filePath, count)
     })
   }
 

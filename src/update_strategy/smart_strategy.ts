@@ -88,7 +88,7 @@ export default class SmartStrategy extends UpdateStrategy {
 
     await this.app.vault.modify(file, modifiedContent)
 
-    this.plugin.events.emit('highlightModified', { filePath: file.path })
+    this.plugin.events.emit('highlightModified', { filePath: file.path, count: highlights.length })
   }
 
   private updateContentWith (content: string, highlights: SomeHighlight[], formatter: (highlight: SomeHighlight) => string): string {
