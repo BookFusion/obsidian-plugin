@@ -40,6 +40,9 @@ const context = await esbuild.context({
   outfile: 'main.js',
   define: {
     'process.env.BOOKFUSION_URL': `"${process.env.BOOKFUSION_URL || ''}"`
+  },
+  loader: {
+    '.svg': 'text'
   }
 })
 
