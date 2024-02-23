@@ -104,8 +104,11 @@ export default class SmartStrategy extends UpdateStrategy {
       const highlightContent = formatter(highlight)
       let target = nodesMap.get(highlight.id)
 
-      if (this.replace && target != null) {
-        target.value.text = replaceBlock(target.value.text, highlight.id, highlightContent)
+      if (target != null) {
+        if (this.replace) {
+          target.value.text = replaceBlock(target.value.text, highlight.id, highlightContent)
+        }
+
         continue
       }
 
