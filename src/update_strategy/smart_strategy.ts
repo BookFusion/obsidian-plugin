@@ -1,7 +1,7 @@
 import { App, TFile, normalizePath } from 'obsidian'
 import { AtomicHighlightPage, BookPage, HighlightBlock, SomeHighlight } from 'src/bookfusion_api'
 import UpdateStrategy from './update_strategy'
-import { DoublyLinkedList, ListNode, formatHighlightLink, replaceBlock, wrapWithMagicComment } from 'src/utils'
+import { DoublyLinkedList, ListNode, formatHighlightContent, formatHighlightLink, replaceBlock, wrapWithMagicComment } from 'src/utils'
 import BookFusionPlugin from 'main'
 
 interface ExtractedHighlight {
@@ -84,7 +84,7 @@ export default class SmartStrategy extends UpdateStrategy {
     }
 
     const content = await this.app.vault.read(file)
-    const modifiedContent = this.updateContentWith(content, highlights, formatHighlightLink)
+    const modifiedContent = this.updateContentWith(content, highlights, formatHighlightContent)
 
     await this.app.vault.modify(file, modifiedContent)
 
