@@ -10,6 +10,11 @@ interface ExtractedHighlight {
   text: string
 }
 
+interface UpdateResult {
+  changesCount: number
+  text: string
+}
+
 export default class SmartStrategy extends UpdateStrategy {
   replace: boolean
 
@@ -30,9 +35,9 @@ export default class SmartStrategy extends UpdateStrategy {
       await this.replaceAtomicHighlights(highlights as AtomicHighlightPage[], file)
 
       const content = await this.app.vault.read(file)
-      const modifiedContent = this.updateContentWith(content, highlights, formatHighlightLink)
+      const { text } = this.updateContentWith(content, highlights, formatHighlightLink)
 
-      await this.app.vault.modify(file, modifiedContent)
+      await this.app.vault.modify(file, text)
     } else {
       await this.replaceHighlights(highlights as HighlightBlock[], file)
     }
@@ -84,17 +89,18 @@ export default class SmartStrategy extends UpdateStrategy {
     }
 
     const content = await this.app.vault.read(file)
-    const modifiedContent = this.updateContentWith(content, highlights, formatHighlightContent)
+    const { text, changesCount } = this.updateContentWith(content, highlights, formatHighlightContent)
 
-    await this.app.vault.modify(file, modifiedContent)
+    await this.app.vault.modify(file, text)
 
-    this.plugin.events.emit('highlightModified', { filePath: file.path, count: highlights.length })
+    this.plugin.events.emit('highlightModified', { filePath: file.path, count: changesCount })
   }
 
-  private updateContentWith (content: string, highlights: SomeHighlight[], formatter: (highlight: SomeHighlight) => string): string {
+  private updateContentWith (content: string, highlights: SomeHighlight[], formatter: (highlight: SomeHighlight) => string): UpdateResult {
     const slices = this.extractHighlightFragments(content)
     const nodesMap = new Map<string, ListNode<ExtractedHighlight>>()
     const nodesDLL = new DoublyLinkedList<ExtractedHighlight>()
+    let changesCount = 0
 
     slices.forEach((value) => {
       nodesMap.set(value.id, nodesDLL.append(value))
@@ -107,6 +113,7 @@ export default class SmartStrategy extends UpdateStrategy {
       if (target != null) {
         if (this.replace) {
           target.value.text = replaceBlock(target.value.text, highlight.id, highlightContent)
+          changesCount++
         }
 
         continue
@@ -119,6 +126,7 @@ export default class SmartStrategy extends UpdateStrategy {
       }
       if (target != null) {
         nodesMap.set(highlight.id, nodesDLL.insertBefore(target, value))
+        changesCount++
         continue
       }
 
@@ -127,10 +135,12 @@ export default class SmartStrategy extends UpdateStrategy {
       }
       if (target != null) {
         nodesMap.set(highlight.id, nodesDLL.insertAfter(target, value))
+        changesCount++
         continue
       }
 
       nodesMap.set(highlight.id, nodesDLL.append(value))
+      changesCount++
     }
 
     let modifiedContent = content.slice(0, slices[0]?.index)
@@ -143,7 +153,7 @@ export default class SmartStrategy extends UpdateStrategy {
       }
     }
 
-    return modifiedContent
+    return { text: modifiedContent, changesCount }
   }
 
   private extractHighlightFragments (text: string): ExtractedHighlight[] {

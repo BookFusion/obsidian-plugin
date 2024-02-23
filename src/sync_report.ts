@@ -52,6 +52,9 @@ export default class SyncReport {
 
   highlightModified (bookPath: string, count: number = 1): void {
     const value = this.highlightsModified.get(bookPath) ?? 0
-    this.highlightsModified.set(bookPath, value + count)
+
+    if (count > 0) {
+      this.highlightsModified.set(bookPath, value + count)
+    }
   }
 }
