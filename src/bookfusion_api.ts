@@ -1,3 +1,4 @@
+import { requestUrl } from 'obsidian'
 import { UpdateStrategyId } from './update_strategy/update_strategy'
 
 /* eslint-disable-next-line @typescript-eslint/strict-boolean-expressions, @typescript-eslint/prefer-nullish-coalescing */
@@ -63,9 +64,16 @@ export class APIError extends Error {
   }
 }
 
+export class SyncAbortedError extends Error {
+  constructor (message: string = 'Sync aborted.') {
+    super(message)
+    this.name = this.constructor.name
+  }
+}
+
 export class SyncTask {
-  abortController: AbortController
   isRunning: boolean = false
+  isAborted: boolean = false
   lastResponse: SyncResponse
   private cursor: string | null
   private readonly token: string
@@ -80,14 +88,12 @@ export class SyncTask {
       return
     }
 
-    this.isRunning = true
-    this.abortController = new AbortController()
-    this.cursor = initialCursor
-    this.cursors.clear()
+    this.initialize(initialCursor)
 
     try {
       do {
-        const response = await fetch(SYNC_URL, {
+        const response = await requestUrl({
+          url: SYNC_URL.toString(),
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -95,20 +101,24 @@ export class SyncTask {
             'API-Version': '1'
           },
           body: JSON.stringify({ cursor: this.cursor }),
-          signal: this.abortController.signal
+          throw: false
         })
 
-        if (!response.ok) {
+        if (this.isAborted) {
+          throw new SyncAbortedError()
+        }
+
+        if (response.status < 200 && response.status > 299) {
           let errorMessage
           try {
-            errorMessage = await response.json()
+            errorMessage = response.json
           } catch {
             throw new Error('Something went wrong')
           }
           throw new APIError(errorMessage.message)
         }
 
-        const data: SyncResponse = await response.json()
+        const data: SyncResponse = await response.json
 
         this.lastResponse = data
 
@@ -132,12 +142,15 @@ export class SyncTask {
     }
   }
 
-  abort (): void {
-    this.abortController?.abort()
-    this.isRunning = false
+  initialize (initialCursor: string | null): void {
+    this.isRunning = true
+    this.isAborted = false
+    this.cursor = initialCursor
+    this.cursors.clear()
   }
 
-  get isAborted (): boolean {
-    return this.abortController?.signal.aborted
+  abort (): void {
+    this.isRunning = false
+    this.isAborted = true
   }
 }

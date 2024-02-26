@@ -2,7 +2,7 @@
 import { App, Notice, Plugin, PluginManifest, TFolder, addIcon } from 'obsidian'
 import { BookFusionPluginSettings, DEFAULT_SETTINGS } from './settings'
 import { BookFusionSettingsTab } from './settings_tab'
-import { APIError, SyncTask } from './bookfusion_api'
+import { APIError, SyncAbortedError, SyncTask } from './bookfusion_api'
 import logger from './logger'
 import ReportModal from './report_modal'
 import SyncReport from './sync_report'
@@ -17,7 +17,7 @@ const SYNC_NOTICE_TEXT = '⏳ Sync in progress'
 export class BookFusionPlugin extends Plugin {
   settings: BookFusionPluginSettings
   syncTimer: number | null
-  syncTask: SyncTask
+  syncTask: SyncTask | null
   syncReport: SyncReport
   events: EventEmitter
   pageProcessor: PageProcessor
@@ -34,7 +34,7 @@ export class BookFusionPlugin extends Plugin {
     this.events.on('indexFailed', ({ filePath, error }) => {
       this.syncReport.indexFailed(filePath, error)
       logger.error(error)
-      logger.log(this.syncTask.lastResponse)
+      logger.log(this.syncTask?.lastResponse)
     })
 
     this.events.on('bookCreated', ({ filePath }) => {
@@ -48,7 +48,7 @@ export class BookFusionPlugin extends Plugin {
     this.events.on('bookFailed', ({ filePath, error }) => {
       this.syncReport.bookFailed(filePath, error)
       logger.error(error)
-      logger.log(this.syncTask.lastResponse)
+      logger.log(this.syncTask?.lastResponse)
     })
 
     this.events.on('highlightModified', ({ filePath, count = 1 }) => {
@@ -95,12 +95,14 @@ export class BookFusionPlugin extends Plugin {
   }
 
   private async requestSync (): Promise<void> {
-    if (this.syncTask?.isRunning) {
+    if (this.syncTask?.isRunning === true) {
       return await new Promise((resolve, _reject) => {
         const confirm =
           new ConfirmationModal(this.app, 'The sync process is currently in progress. Do you want to stop it?')
         confirm.onPositive = () => {
-          this.syncTask.abort()
+          this.syncTask?.abort()
+          this.syncTask = null
+
           resolve()
         }
         confirm.onNegative = () => {
@@ -163,9 +165,8 @@ export class BookFusionPlugin extends Plugin {
       if (error instanceof APIError) {
         new Notice('🛑 ' + error.message)
         logger.error(error)
-      } else if (this.syncTask.isAborted) {
-        new Notice('🛑 Sync stopped by user')
-        logger.log('Sync stopped by user')
+      } else if (error instanceof SyncAbortedError) {
+        logger.log('Sync aborted by user')
       } else {
         new Notice('💥 Sync failed due to an error')
         logger.error(error)
@@ -177,7 +178,7 @@ export class BookFusionPlugin extends Plugin {
   }
 
   private async syncTimerHandler (): Promise<void> {
-    if (this.syncTask?.isRunning) return
+    if (this.syncTask?.isRunning === true) return
 
     await this.syncCommand(true)
     await this.rescheduleSync()
