@@ -1,7 +1,7 @@
 {
   "id": "bookfusion",
   "name": "BookFusion",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "minAppVersion": "0.15.0",
   "description": "Import your BookFusion highlights into Obsidian.",
   "author": "BookFusion",
