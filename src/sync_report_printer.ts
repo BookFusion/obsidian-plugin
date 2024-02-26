@@ -1,4 +1,4 @@
-import { App, TFile, TFolder } from 'obsidian'
+import { App, TFile } from 'obsidian'
 import SyncReport from './sync_report'
 
 const PATH = 'BookFusion Sync Log.md'
@@ -11,15 +11,15 @@ export default class SyncReportPrinter {
   }
 
   async append (report: SyncReport): Promise<void> {
-    let file = this.app.vault.getAbstractFileByPath(PATH)
+    const file = this.app.vault.getAbstractFileByPath(PATH)
 
     if (file == null) {
-      file = await this.app.vault.create(PATH, '')
-    } else if (file instanceof TFolder) {
-      throw new Error('There is folder instead of file.')
+      await this.app.vault.create(PATH, '')
+    } else if (file instanceof TFile) {
+      await this.app.vault.append(file, this.format(report))
+    } else {
+      throw new Error('Not a file')
     }
-
-    await this.app.vault.append(file as TFile, this.format(report))
   }
 
   private format (report: SyncReport): string {
