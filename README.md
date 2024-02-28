@@ -2,7 +2,7 @@
 
 ## Overview
 
-Elevate your Obsidian workflow with the [BookFusion](https://www.bookfusion.com/) plugin, the premier solution for seamlessly importing highlights (including area/image and text), notes, reviews, and annotations into your Obsidian vault.
+Elevate your Obsidian workflow with the [BookFusion](https://www.bookfusion.com/) plugin, the premier solution for seamlessly importing highlights (including area/image and text), notes, reviews, and annotations into your Obsidian vault.BookFusion is the best way to organize, read, share and derive value from your eBooks (PDFs, EPUBS, CBZ/CBR , MOBI/AZW & other formats) & articles whether you are using it to learn, for work or for pleasure. BookFusion is a seperate and external service from Obsidian. 
 
 Discover deeper understanding and insights from your consumed content with the most versatile and powerful plugin available for Obsidian. Start transforming your reading into actionable knowledge today.
 
