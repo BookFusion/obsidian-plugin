@@ -154,7 +154,7 @@ export class BookFusionPlugin extends Plugin {
       }
 
       if (this.settings.syncLogEnabled ?? false) {
-        void new SyncReportPrinter(this.app).append(this.syncReport)
+        void new SyncReportPrinter(this).append(this.syncReport)
       }
 
       logger.log('Sync completed')

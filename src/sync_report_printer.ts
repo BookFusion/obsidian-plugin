@@ -1,20 +1,32 @@
-import { App, TFile } from 'obsidian'
+import { App, TFile, TFolder, normalizePath } from 'obsidian'
 import SyncReport from './sync_report'
-
-const PATH = 'BookFusion Sync Log.md'
+import { BookFusionPlugin } from './plugin'
 
 export default class SyncReportPrinter {
+  plugin: BookFusionPlugin
   app: App
 
-  constructor (app: App) {
-    this.app = app
+  constructor (plugin: BookFusionPlugin) {
+    this.plugin = plugin
+    this.app = plugin.app
   }
 
   async append (report: SyncReport): Promise<void> {
-    const file = this.app.vault.getAbstractFileByPath(PATH)
+    const path = normalizePath(this.plugin.settings.syncLogPath)
+    const file = this.app.vault.getAbstractFileByPath(path)
 
     if (file == null) {
-      await this.app.vault.create(PATH, '')
+      const [folderName, fileName] = path.split('/')
+
+      if (fileName !== '') {
+        const folder = this.app.vault.getAbstractFileByPath(folderName)
+
+        if (!(folder instanceof TFolder)) {
+          await this.app.vault.createFolder(folderName)
+        }
+      }
+
+      await this.app.vault.create(path, this.format(report))
     } else if (file instanceof TFile) {
       await this.app.vault.append(file, this.format(report))
     } else {

@@ -1,6 +1,7 @@
-import { App, PluginSettingTab, Setting } from 'obsidian'
+import { App, ButtonComponent, PluginSettingTab, Setting } from 'obsidian'
 import { BASE_URL } from './bookfusion_api'
 import { BookFusionPlugin } from './plugin'
+import { DEFAULT_SETTINGS } from './settings'
 
 const INTERVAL_OPTIONS = {
   Manual: 0,
@@ -15,6 +16,7 @@ const MS_IN_MINUTE = 60_000
 
 export class BookFusionSettingsTab extends PluginSettingTab {
   plugin: BookFusionPlugin
+  private clearStateButton: ButtonComponent
 
   constructor (app: App, plugin: BookFusionPlugin) {
     super(app, plugin)
@@ -58,21 +60,8 @@ export class BookFusionSettingsTab extends PluginSettingTab {
           .onClick(this.disconnect.bind(this))
       })
 
-    new Setting(this.containerEl)
-      .setName('Clear synchronization state')
-      .addButton((buttonComponent) => {
-        buttonComponent.setIcon('trash')
-
-        if (this.plugin.settings.cursor == null) {
-          buttonComponent
-            .setDisabled(true)
-            .setClass('mod-muted')
-        } else {
-          buttonComponent
-            .setWarning()
-            .onClick(this.clearSyncState.bind(this))
-        }
-      })
+    this.addClearStateButton()
+    this.updateClearStateButton()
 
     let autoSyncDescription = ''
 
@@ -102,6 +91,20 @@ export class BookFusionSettingsTab extends PluginSettingTab {
           .setValue(Boolean(this.plugin.settings.syncLogEnabled))
           .onChange(this.toggleSyncLog.bind(this))
       })
+
+    new Setting(this.containerEl)
+      .setName('Path to Sync Log')
+      .addText((textComponent) => {
+        textComponent
+          .setPlaceholder('Enter the path to sync log')
+          .setValue(this.plugin.settings.syncLogPath)
+          .onChange(this.updateSyncPath.bind(this))
+      })
+      .addExtraButton((button) => {
+        button
+          .setIcon('reset')
+          .onClick(this.resetPathToLog.bind(this))
+      })
   }
 
   private connect (): void {
@@ -120,10 +123,26 @@ export class BookFusionSettingsTab extends PluginSettingTab {
     this.display()
   }
 
+  private addClearStateButton (): void {
+    new Setting(this.containerEl)
+      .setName('Clear synchronization state')
+      .addButton((buttonComponent) => {
+        this.clearStateButton = buttonComponent.setIcon('trash').onClick(this.clearSyncState.bind(this))
+      })
+  }
+
+  private updateClearStateButton (): void {
+    const isEmptyCursor = this.plugin.settings.cursor == null
+
+    this.clearStateButton.setDisabled(isEmptyCursor)
+    this.clearStateButton.buttonEl.classList.toggle('mod-warning', !isEmptyCursor)
+    this.clearStateButton.buttonEl.classList.toggle('mod-muted', isEmptyCursor)
+  }
+
   private async clearSyncState (): Promise<void> {
     this.plugin.settings.cursor = null
+    this.updateClearStateButton()
     await this.plugin.saveSettings()
-    this.display()
   }
 
   private async applyAutoSync (value: string): Promise<void> {
@@ -140,12 +159,21 @@ export class BookFusionSettingsTab extends PluginSettingTab {
     }
 
     await this.plugin.saveSettings()
-    this.display()
   }
 
   private async toggleSyncLog (value: boolean): Promise<void> {
     this.plugin.settings.syncLogEnabled = value
 
+    await this.plugin.saveSettings()
+  }
+
+  private async updateSyncPath (value: string): Promise<void> {
+    this.plugin.settings.syncLogPath = value
+    await this.plugin.saveSettings()
+  }
+
+  private async resetPathToLog (): Promise<void> {
+    this.plugin.settings.syncLogPath = String(DEFAULT_SETTINGS.syncLogPath)
     await this.plugin.saveSettings()
     this.display()
   }
