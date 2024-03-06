@@ -33,7 +33,7 @@ export default class SyncReportPrinter {
     report.booksModified.forEach(({ path }) => groupedByPath.set(path, 0))
     report.highlightsModified.forEach((highlightsNumber, bookPath) => groupedByPath.set(bookPath, highlightsNumber))
 
-    let data = `## ${new Date().toLocaleString()}\n| Book | Link | Highlights |\n| - | - | - |\n`
+    let data = `## ${new Date().toLocaleString()}\n`
 
     groupedByPath.forEach((highlightsNumber, bookPath) => {
       let link = '-'
@@ -41,9 +41,9 @@ export default class SyncReportPrinter {
 
       if (file instanceof TFile) {
         link = `[Open](obsidian://open?file=${encodeURIComponent(file.path)})`
-        data += `| ${file.basename} | ${link} | ${highlightsNumber} |\n`
+        data += `- ${file.basename} ${link} ${highlightsNumber}\n`
       } else {
-        data += `| ${bookPath} | - | ${highlightsNumber} |\n`
+        data += `- ${bookPath} ${highlightsNumber}\n`
       }
     })
 
