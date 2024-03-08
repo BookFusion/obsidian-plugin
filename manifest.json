@@ -1,7 +1,7 @@
 {
   "id": "bookfusion",
   "name": "BookFusion",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "minAppVersion": "0.15.0",
   "description": "Import your BookFusion highlights & annotations into your vault.",
   "author": "BookFusion",

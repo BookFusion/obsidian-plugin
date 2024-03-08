@@ -1,6 +1,6 @@
 {
   "name": "@bookfusion/obsidian-plugin",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Import your BookFusion (https://www.bookfusion.com) highlights into Obsidian (https://obsidian.md).",
   "main": "main.js",
   "scripts": {
