@@ -71,10 +71,16 @@ series: {% for serie in series %}
 {%- endfor %}
 {% endif -%}
 
+{% if authors -%}
+authors: {% for author in authors %}
+{{ author | append:']]"'| prepend:   '- "[[ ' }}
+{%- endfor %}
+{% endif -%}
+
 {% if tags -%}
 tags: {% for tag in tags %}
-{{ tag | prepend: '  - #' }}
-{%- endfor %} 
+{{ tag | replace: ' ', '_' | prepend: ' - ' }}
+{%- endfor %}
 {% endif -%}
 
 asset: {{ book_url }}
