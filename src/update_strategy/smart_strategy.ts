@@ -1,8 +1,9 @@
-import { App, TFile, normalizePath } from 'obsidian'
+import { App, TFile, normalizePath, parseYaml } from 'obsidian'
 import { AtomicHighlightPage, BookPage, HighlightBlock, SomeHighlight } from 'src/bookfusion_api'
 import UpdateStrategy from './update_strategy'
 import { DoublyLinkedList, ListNode, formatHighlightContent, formatHighlightLink, replaceBlock, wrapWithMagicComment } from 'src/utils'
 import BookFusionPlugin from 'main'
+import logger from 'src/logger'
 
 interface ExtractedHighlight {
   id: string
@@ -16,6 +17,9 @@ interface UpdateResult {
 }
 
 export default class SmartStrategy extends UpdateStrategy {
+  /**
+   * Switch Magic Update / Smart Insert
+  */
   replace: boolean
 
   constructor (plugin: BookFusionPlugin, app: App, replace: boolean = true) {
@@ -48,6 +52,24 @@ export default class SmartStrategy extends UpdateStrategy {
   private async replaceBook (page: BookPage, file: TFile): Promise<void> {
     const content = await this.app.vault.read(file)
     const newContent = replaceBlock(content, page.id, String(page.content))
+
+    if (this.replace) {
+      try {
+        let oldFrontMatter, newFrontMatter
+        await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
+          oldFrontMatter = JSON.stringify(frontmatter)
+          Object.assign(frontmatter, parseYaml(String(page.frontmatter)))
+          newFrontMatter = JSON.stringify(frontmatter)
+        })
+
+        if (oldFrontMatter !== newFrontMatter) {
+          this.plugin.events.emit('bookModified', { filePath: file.path })
+        }
+      } catch (error) {
+        logger.error(error)
+        this.plugin.events.emit('bookFailed', { filePath: file.path, error })
+      }
+    }
 
     if (content.trim() !== newContent.trim()) {
       await this.app.vault.modify(file, newContent)
