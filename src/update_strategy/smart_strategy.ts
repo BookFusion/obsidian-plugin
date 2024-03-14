@@ -1,7 +1,7 @@
 import { App, TFile, normalizePath, parseYaml } from 'obsidian'
 import { AtomicHighlightPage, BookPage, HighlightBlock, SomeHighlight } from 'src/bookfusion_api'
 import UpdateStrategy from './update_strategy'
-import { DoublyLinkedList, ListNode, formatHighlightContent, formatHighlightLink, replaceBlock, wrapWithMagicComment } from 'src/utils'
+import { DoublyLinkedList, ListNode, formatHighlightContent, formatHighlightLink, replaceBlock } from 'src/utils'
 import BookFusionPlugin from 'main'
 import logger from 'src/logger'
 
@@ -99,7 +99,7 @@ export default class SmartStrategy extends UpdateStrategy {
           this.plugin.events.emit('highlightModified', { filePath: file.path })
         }
       } else if (highlightFile == null) {
-        await this.app.vault.create(filePath, wrapWithMagicComment(highlight.id, highlight.content))
+        await this.app.vault.create(filePath, this.wrapWithMagicComment(highlight.id, highlight.content))
         this.plugin.events.emit('highlightModified', { filePath: file.path })
       }
     }
@@ -141,7 +141,7 @@ export default class SmartStrategy extends UpdateStrategy {
         continue
       }
 
-      const value = { id: highlight.id, index: -1, text: wrapWithMagicComment(highlight.id, highlightContent) }
+      const value = { id: highlight.id, index: -1, text: this.wrapWithMagicComment(highlight.id, highlightContent) }
 
       if (highlight.next != null) {
         target = nodesMap.get(highlight.next)

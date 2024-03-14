@@ -1,10 +1,9 @@
 import { App, TFile, TFolder, normalizePath } from 'obsidian'
-import { AtomicHighlightPage, BookPage, HighlightBlock, IndexPage, Page } from './bookfusion_api'
+import { BookPage, IndexPage, Page } from './bookfusion_api'
 import { BookFusionPlugin } from './plugin'
 import AppendStrategy from './update_strategy/append_strategy'
 import ReplaceStrategy from './update_strategy/replace_strategy'
 import UpdateStrategy from './update_strategy/update_strategy'
-import { formatHighlightContent, formatHighlightLink, wrapWithMagicComment } from './utils'
 import SmartStrategy from './update_strategy/smart_strategy'
 
 export default class PageProcessor {
@@ -71,42 +70,7 @@ export default class PageProcessor {
   }
 
   private async createBookPage (page: BookPage, filePath: string): Promise<TFile> {
-    let content = wrapWithMagicComment(page.id, String(page.content))
-
-    if (page.frontmatter != null) {
-      content = `---\n${page.frontmatter}\n---\n${content}\n`
-    }
-
-    if (page.highlights.length > 0) {
-      if (page.atomic_highlights) {
-        for (const highlight of page.highlights as AtomicHighlightPage[]) {
-          content += wrapWithMagicComment(highlight.id, formatHighlightLink(highlight))
-
-          const dirPath = normalizePath(highlight.directory)
-          const directory = this.app.vault.getAbstractFileByPath(dirPath)
-
-          if (!(directory instanceof TFolder)) {
-            await this.plugin.tryCreateFolder(dirPath)
-          }
-
-          await this.app.vault.create(normalizePath(`${dirPath}/${highlight.filename}`), highlight.content)
-
-          this.plugin.events.emit('highlightModified', { filePath })
-        }
-      } else {
-        for (const highlight of page.highlights as HighlightBlock[]) {
-          content += wrapWithMagicComment(highlight.id, formatHighlightContent(highlight))
-
-          this.plugin.events.emit('highlightModified', { filePath })
-        }
-      }
-    }
-
-    const file = await this.app.vault.create(filePath, content)
-
-    this.plugin.events.emit('bookCreated', { filePath })
-
-    return file
+    return await this.buildStrategy(page).createBookPage(page, filePath)
   }
 
   private async modifyBookPage (page: BookPage, file: TFile): Promise<TFile> {

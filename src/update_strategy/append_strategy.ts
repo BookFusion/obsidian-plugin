@@ -1,7 +1,6 @@
 import { TFile, normalizePath } from 'obsidian'
 import { AtomicHighlightPage, BookPage, HighlightBlock } from 'src/bookfusion_api'
 import UpdateStrategy from './update_strategy'
-import { wrapWithMagicComment } from 'src/utils'
 
 export default class AppendStrategy extends UpdateStrategy {
   async modifyBookPage (page: BookPage, file: TFile): Promise<TFile> {
@@ -12,12 +11,12 @@ export default class AppendStrategy extends UpdateStrategy {
     }
 
     if (page.atomic_highlights) {
-      const formatter = (highlight: AtomicHighlightPage): string => wrapWithMagicComment(highlight.id, highlight.link)
+      const formatter = (highlight: AtomicHighlightPage): string => this.wrapWithMagicComment(highlight.id, highlight.link)
 
       await this.appendAtomicHighlights(highlights as AtomicHighlightPage[], file)
       await this.appendHighlights(highlights as AtomicHighlightPage[], file, formatter)
     } else {
-      const formatter = (highlight: HighlightBlock): string => wrapWithMagicComment(highlight.id, highlight.content)
+      const formatter = (highlight: HighlightBlock): string => this.wrapWithMagicComment(highlight.id, highlight.content)
 
       await this.appendHighlights(highlights as HighlightBlock[], file, formatter)
     }
