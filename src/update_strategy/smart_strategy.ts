@@ -1,8 +1,9 @@
-import { App, TFile, normalizePath } from 'obsidian'
+import { App, TFile, normalizePath, parseYaml } from 'obsidian'
 import { AtomicHighlightPage, BookPage, HighlightBlock, SomeHighlight } from 'src/bookfusion_api'
 import UpdateStrategy from './update_strategy'
-import { DoublyLinkedList, ListNode, formatHighlightContent, formatHighlightLink, replaceBlock, wrapWithMagicComment } from 'src/utils'
+import { DoublyLinkedList, ListNode, formatHighlightContent, formatHighlightLink, replaceBlock } from 'src/utils'
 import BookFusionPlugin from 'main'
+import logger from 'src/logger'
 
 interface ExtractedHighlight {
   id: string
@@ -16,6 +17,9 @@ interface UpdateResult {
 }
 
 export default class SmartStrategy extends UpdateStrategy {
+  /**
+   * Switch Magic Update / Smart Insert
+  */
   replace: boolean
 
   constructor (plugin: BookFusionPlugin, app: App, replace: boolean = true) {
@@ -49,6 +53,24 @@ export default class SmartStrategy extends UpdateStrategy {
     const content = await this.app.vault.read(file)
     const newContent = replaceBlock(content, page.id, String(page.content))
 
+    if (this.replace) {
+      try {
+        let oldFrontMatter, newFrontMatter
+        await this.app.fileManager.processFrontMatter(file, (frontmatter) => {
+          oldFrontMatter = JSON.stringify(frontmatter)
+          Object.assign(frontmatter, parseYaml(String(page.frontmatter)))
+          newFrontMatter = JSON.stringify(frontmatter)
+        })
+
+        if (oldFrontMatter !== newFrontMatter) {
+          this.plugin.events.emit('bookModified', { filePath: file.path })
+        }
+      } catch (error) {
+        logger.error(error)
+        this.plugin.events.emit('bookFailed', { filePath: file.path, error })
+      }
+    }
+
     if (content.trim() !== newContent.trim()) {
       await this.app.vault.modify(file, newContent)
       this.plugin.events.emit('bookModified', { filePath: file.path })
@@ -77,7 +99,7 @@ export default class SmartStrategy extends UpdateStrategy {
           this.plugin.events.emit('highlightModified', { filePath: file.path })
         }
       } else if (highlightFile == null) {
-        await this.app.vault.create(filePath, wrapWithMagicComment(highlight.id, highlight.content))
+        await this.app.vault.create(filePath, this.wrapWithMagicComment(highlight.id, highlight.content))
         this.plugin.events.emit('highlightModified', { filePath: file.path })
       }
     }
@@ -119,7 +141,7 @@ export default class SmartStrategy extends UpdateStrategy {
         continue
       }
 
-      const value = { id: highlight.id, index: -1, text: wrapWithMagicComment(highlight.id, highlightContent) }
+      const value = { id: highlight.id, index: -1, text: this.wrapWithMagicComment(highlight.id, highlightContent) }
 
       if (highlight.next != null) {
         target = nodesMap.get(highlight.next)

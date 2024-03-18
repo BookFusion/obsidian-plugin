@@ -1,7 +1,7 @@
 import { TFile, normalizePath } from 'obsidian'
 import { AtomicHighlightPage, BookPage, HighlightBlock, SomeHighlight } from 'src/bookfusion_api'
 import UpdateStrategy from './update_strategy'
-import { formatHighlightContent, formatHighlightLink, wrapWithMagicComment } from 'src/utils'
+import { formatHighlightContent, formatHighlightLink } from 'src/utils'
 
 export default class ReplaceStrategy extends UpdateStrategy {
   async modifyBookPage (page: BookPage, file: TFile): Promise<TFile> {
@@ -11,14 +11,14 @@ export default class ReplaceStrategy extends UpdateStrategy {
 
     if (page.atomic_highlights) {
       const formatter = (highlight: AtomicHighlightPage): string => {
-        return wrapWithMagicComment(highlight.id, formatHighlightLink(highlight))
+        return formatHighlightLink(highlight)
       }
 
       await this.appendHighlights(highlights as HighlightBlock[], file, formatter)
       await this.replaceAtomicHighlights(highlights as AtomicHighlightPage[])
     } else {
       const formatter = (highlight: HighlightBlock): string => {
-        return wrapWithMagicComment(highlight.id, formatHighlightContent(highlight))
+        return formatHighlightContent(highlight)
       }
 
       await this.appendHighlights(highlights as HighlightBlock[], file, formatter)
@@ -64,9 +64,13 @@ export default class ReplaceStrategy extends UpdateStrategy {
     }
 
     for (const highlight of highlights) {
-      await this.app.vault.append(file, formatter(highlight))
+      await this.app.vault.append(file, formatter(highlight) + '\n')
     }
 
     this.plugin.events.emit('highlightModified', { filePath: file.path, count: highlights.length })
+  }
+
+  protected wrapWithMagicComment (id: string, content: string): string {
+    return content + '\n'
   }
 }

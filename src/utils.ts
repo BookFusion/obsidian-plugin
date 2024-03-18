@@ -1,7 +1,7 @@
 import { AtomicHighlightPage, HighlightBlock } from './bookfusion_api'
 
 export function wrapWithMagicComment (id: string, content: string): string {
-  return `%%begin-${id}%%\n${content}\n%%end-${id}%%\n\n`
+  return `%%begin-${id}%%\n${content}\n%%end-${id}%%\n`
 }
 
 export function replaceBlock (content: string, id: string, fragment: string): string {
