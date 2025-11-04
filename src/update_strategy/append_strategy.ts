@@ -11,12 +11,12 @@ export default class AppendStrategy extends UpdateStrategy {
     }
 
     if (page.atomic_highlights) {
-      const formatter = (highlight: AtomicHighlightPage): string => this.wrapWithMagicComment(highlight.id, highlight.link)
+      const formatter = (highlight: AtomicHighlightPage): string => highlight.link
 
       await this.appendAtomicHighlights(highlights as AtomicHighlightPage[], file)
       await this.appendHighlights(highlights as AtomicHighlightPage[], file, formatter)
     } else {
-      const formatter = (highlight: HighlightBlock): string => this.wrapWithMagicComment(highlight.id, highlight.content)
+      const formatter = (highlight: HighlightBlock): string => highlight.content
 
       await this.appendHighlights(highlights as HighlightBlock[], file, formatter)
     }
@@ -41,25 +41,19 @@ export default class AppendStrategy extends UpdateStrategy {
   }
 
   private async appendHighlights (highlights: HighlightBlock[], file: TFile, formatter: (highlight: HighlightBlock) => string): Promise<void> {
-    const content = await this.app.vault.read(file)
-    const magicRegexp = /%%begin-(highlight-.+)%%/g
-    const magicIds = new Set()
     let highlightsAdded = 0
-    let match
-
-    while ((match = magicRegexp.exec(content)) != null) {
-      magicIds.add(match[1])
-    }
 
     for (const highlight of highlights) {
-      if (!magicIds.has(highlight.id)) {
-        await this.app.vault.append(file, formatter(highlight))
-        highlightsAdded++
-      }
+      await this.app.vault.append(file, formatter(highlight))
+      highlightsAdded++
     }
 
     if (highlightsAdded > 0) {
       this.plugin.events.emit('highlightModified', { filePath: file.path, count: highlightsAdded })
     }
+  }
+
+  protected wrapWithMagicComment (id: string, content: string): string {
+    return content + '\n'
   }
 }
