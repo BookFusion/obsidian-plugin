@@ -108,7 +108,7 @@ export class SyncTask {
           throw new SyncAbortedError()
         }
 
-        if (response.status < 200 && response.status > 299) {
+        if (response.status < 200 || response.status > 299) {
           let errorMessage
           try {
             errorMessage = response.json
