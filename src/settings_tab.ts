@@ -108,7 +108,9 @@ export class BookFusionSettingsTab extends PluginSettingTab {
   }
 
   private connect (): void {
-    window.open(new URL('/obsidian-api/connect', BASE_URL))
+    const url = new URL('/obsidian-api/connect', BASE_URL)
+    url.searchParams.set('_', String(Date.now()))
+    window.open(url)
   }
 
   private async openSettingsPage (): Promise<void> {
